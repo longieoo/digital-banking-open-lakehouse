@@ -10,7 +10,7 @@ alone does not establish runtime acceptance.
 | 1 | Sources/generator | PASS: 4 deterministic/invariant tests. PostgreSQL startup UNAVAILABLE (Docker absent). |
 | 2 | Incremental/recovery/backfill | PASS: 7 failure/state tests using explicit SQLite Bronze contract double. |
 | 3 / 3.5 | MinIO/REST/Iceberg and real infrastructure | Adapters and Compose implemented; local Iceberg test awaiting dependencies; Docker integration UNAVAILABLE. |
-| 4 | Spark Silver | Pending |
+| 4 | Spark Silver | PASS: Python compilation. Runtime test UNAVAILABLE (Java/Docker absent). |
 | 5 | Trino | Pending |
 | 6 / 7 | dbt Gold and data products | Pending |
 | 8 | GL/reconciliation | Pending |

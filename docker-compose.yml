@@ -62,7 +62,14 @@ services:
     env_file: .env
     volumes: ["./runtime:/opt/bank/runtime"]
     command: [manifests]
+  spark:
+    build: {context: ., dockerfile: docker/spark.Dockerfile}
+    profiles: [processing]
+    env_file: .env
+    volumes: ["./runtime:/opt/bank/runtime", "spark-ivy:/opt/spark/.ivy2"]
+    mem_limit: 4g
 volumes:
   postgres-data:
   minio-data:
   catalog-data:
+  spark-ivy:
