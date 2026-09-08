@@ -8,7 +8,7 @@ alone does not establish runtime acceptance.
 |---|---|---|
 | 0 | Bootstrap | PASS: package test; commit a27208a |
 | 1 | Sources/generator | PASS: 4 deterministic/invariant tests. PostgreSQL startup UNAVAILABLE (Docker absent). |
-| 2 | Incremental/recovery/backfill | Pending |
+| 2 | Incremental/recovery/backfill | PASS: 7 failure/state tests using explicit SQLite Bronze contract double. |
 | 3 / 3.5 | MinIO/REST/Iceberg and real infrastructure | Pending |
 | 4 | Spark Silver | Pending |
 | 5 | Trino | Pending |
