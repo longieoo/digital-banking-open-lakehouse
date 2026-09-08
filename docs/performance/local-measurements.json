@@ -1,0 +1,28 @@
+{
+  "environment": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.14",
+  "cpu_count": 16,
+  "scope": "single local process, SQL catalog, filesystem, cold-ish single samples; not a statistical benchmark",
+  "measurements": [
+    {
+      "rows": 1000,
+      "parquet_write_seconds": 0.008842200004437473,
+      "iceberg_write_seconds": 0.1370180000012624,
+      "parquet_read_seconds": 0.02095710000139661,
+      "iceberg_read_seconds": 0.08348130000376841,
+      "iceberg_data_files": 1,
+      "snapshots": 1,
+      "checks": "PASS"
+    },
+    {
+      "rows": 10000,
+      "parquet_write_seconds": 0.012660100001085084,
+      "iceberg_write_seconds": 0.1021104000028572,
+      "parquet_read_seconds": 0.02401109999482287,
+      "iceberg_read_seconds": 0.08289009999862174,
+      "iceberg_data_files": 1,
+      "snapshots": 1,
+      "checks": "PASS"
+    }
+  ]
+}

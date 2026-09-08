@@ -14,7 +14,7 @@ alone does not establish runtime acceptance.
 | 5 | Trino | PASS: YAML/config parse. Live query UNAVAILABLE. |
 | 6 / 7 | dbt Gold and data products | PASS: 4 business SQL tests executing actual models through DuckDB translation; Trino materialization UNAVAILABLE. |
 | 8 | GL/reconciliation | PASS: 5 actual SQL mismatch tests, including balanced GL misallocation; good data PASS. |
-| 9 | Performance | Pending |
+| 9 | Performance | PASS: measured 1K/10K local Iceberg/Parquet. Spark/JDBC experiments implemented, runtime UNAVAILABLE. |
 | 10 / 11 | Metadata/Airflow | Pending |
 | 12 | Streaming | Pending |
 | 13 / 14 | Quality/security | Pending |
