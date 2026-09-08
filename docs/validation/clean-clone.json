@@ -1,0 +1,20 @@
+{
+  "checked_commit": "19505de",
+  "executed_at": "2026-09-08T01:45:00.613642+00:00",
+  "local_tests": {
+    "status": "PASS",
+    "discovered": 35,
+    "passed": 33,
+    "skipped": 2
+  },
+  "lint": "PASS",
+  "hygiene": "PASS",
+  "dbt_parse": "PASS",
+  "local_demo": "PASS",
+  "terraform_fresh_init": {
+    "status": "FAIL",
+    "reason": "Local provider checksum calculation returned Access is denied; archive and unpacked mirror attempts failed."
+  },
+  "terraform_working_repository_validate": "PASS",
+  "dependency_scope": "Previously installed test dependencies reused; clone contained only committed files."
+}

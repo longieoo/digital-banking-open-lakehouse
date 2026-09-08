@@ -67,7 +67,9 @@ schema and partition evolution, manifests/data files, retry and catalog reopen.
 
 Lint, Python compilation and dbt 1.11.14/trino adapter 1.9.3 parsing pass. Gold/risk
 business SQL executes through DuckDB; it does not prove Trino/Spark interoperability.
-See [machine-readable local results](validation/local-tests.json).
+See [machine-readable local results](validation/local-tests.json) and
+[clean-clone results](validation/clean-clone.json). The clone reused the installed
+test dependencies; no untracked project files were copied.
 
 ## Data quality
 
@@ -102,7 +104,10 @@ Terraform 1.11.4 and AzureRM 4.26.0 **init/fmt/validate PASS** using verified re
 archives. Resources include Resource Group, HNS-enabled storage, raw/warehouse,
 scoped pipeline RBAC, restricted network access and RBAC Key Vault. Windows/Linux
 provider archive hashes are in the lock file. No Azure plan/apply, ADLS I/O, identity
-test or cost measurement occurred. Cloud catalog hosting/identity remains manual.
+test or cost measurement occurred. Cloud catalog hosting/identity remains manual. A fresh-clone initialization attempt subsequently
+failed with a local checksum file-access error, even with verified local archives.
+Working-repository validation still passes; fresh Terraform installation remains
+an explicit external recheck.
 
 ## Performance experiments
 
@@ -136,7 +141,8 @@ scripts exist but no timing numbers are claimed without their runtime.
 | Spark/JDBC benchmark | UNAVAILABLE | Executable experiment; no fabricated results |
 | GitHub Actions hosted run | UNAVAILABLE | Workflow configuration exists; not published/run |
 | Power BI artifact | UNAVAILABLE | Semantic guide/DAX supplied; no PBIX |
-| Clean-clone local gate | Pending | Final repository audit in progress |
+| Clean-clone local gate | PASS | 33 tests, lint, hygiene, demo and dbt parse at commit 19505de |
+| Fresh-clone Terraform init | FAIL | Local provider checksum file-access error; working-repository validate still PASS |
 
 ## Repository structure
 

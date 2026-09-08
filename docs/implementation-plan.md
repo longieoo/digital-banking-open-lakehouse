@@ -20,7 +20,7 @@ alone does not establish runtime acceptance.
 | 13 / 14 | Quality/security | PASS: 33 executed tests, lint, masking/rules and fixture checks. 2 service tests SKIPPED for unavailable runtime. |
 | 15 | Azure/Terraform | PASS: Terraform 1.11.4 init, fmt and validate with AzureRM 4.26.0. Azure plan/apply UNAVAILABLE (no credentials). |
 | 16 / 17 | CI/observability/BI | PASS: workflow YAML and monitoring code checks. CI hosted run / Power BI GUI UNAVAILABLE; DAX and semantic specification supplied. |
-| 18 | Portfolio freeze | Docs/ADRs/diagrams and final local checks PASS; clean-clone gate in progress. |
+| 18 | Portfolio freeze | PASS: clean-clone 33 local tests, lint, hygiene, demo, dbt parse. Terraform fresh-clone init FAIL (local checksum file-access error); original validate PASS. Distributed gates remain UNAVAILABLE. |
 
 Environment discovery: Python 3.12 and Git available; Docker daemon/Java absent.
 Terraform was subsequently downloaded and verified; init/fmt/validate PASS.

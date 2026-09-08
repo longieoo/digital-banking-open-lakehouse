@@ -10,7 +10,8 @@ The central question: **can a pipeline fail, retry and backfill without losing o
 - **UNAVAILABLE:** authoring-machine Docker/Java; deployed PostgreSQL/MinIO/REST/Spark/Trino/Airflow/Redpanda acceptance; Azure deployment; Power BI Desktop.
 - **Explicit substitute:** Gold tests run the actual dbt SQL through DuckDB translation against typed fixture Silver. This is not distributed E2E. The public FX endpoint returned HTTP 403; its fixture is labeled.
 
-See the [validation ledger](docs/implementation-plan.md), [test boundaries](docs/testing.md) and [known limitations](docs/limitations.md). Code existence is not runtime validation.
+See the [validation ledger](docs/implementation-plan.md), [test boundaries](docs/testing.md) and [known limitations](docs/limitations.md). Code existence is not runtime validation. Fresh-clone local tests pass; a fresh
+Terraform initialization hit a local file-access error, documented in the report.
 
 ## Architecture
 

@@ -42,3 +42,8 @@ deliberate migration. Catalog hosting/authentication is a manual cloud prerequis
 Authoring validation: Terraform init/fmt/validate PASS with AzureRM 4.26.0.
 The local mirror archives were SHA256-checked against HashiCorp release checksums;
 the lock file includes verified Windows/Linux archive hashes. Azure was not contacted.
+
+Fresh-clone recheck: local provider checksum calculation returned Access is denied
+with both archive and unpacked mirrors. This initialization attempt is recorded
+as FAIL; working-repository validation remains PASS. Re-run init on the developer
+machine/CI before plan/apply. No checksum mismatch or cloud result was inferred.

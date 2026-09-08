@@ -29,3 +29,7 @@
     demonstration, not a shared-network security perimeter. Catalog fixture is local-only.
 12. No real Power BI artifact/screenshots, GitHub CI run, Datadog deployment or paid
     service was fabricated. No production banking or large-scale performance claim.
+
+Fresh-clone Terraform init also encountered a local provider-checksum file-access
+error (FAIL). The existing working-repository validate passed. This distinction
+is retained in validation/clean-clone.json and needs a normal-machine recheck.

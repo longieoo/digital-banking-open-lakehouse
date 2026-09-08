@@ -13,3 +13,4 @@ b79cec3 feat: add Redpanda streaming and tested transaction risk rules
 dd55a68 feat: provision validated Azure ADLS and Key Vault infrastructure
 8ebe8f3 ci: add validation monitoring and Power BI serving specification
 32b93e1 fix: harden conformance runtime ownership and late-event classification
+19505de docs: freeze architecture runbooks and honest validation report
