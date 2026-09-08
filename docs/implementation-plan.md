@@ -6,8 +6,8 @@ alone does not establish runtime acceptance.
 
 | Phase | Scope | Validation |
 |---|---|---|
-| 0 | Bootstrap | In progress |
-| 1 | Sources/generator | Pending |
+| 0 | Bootstrap | PASS: package test; commit a27208a |
+| 1 | Sources/generator | PASS: 4 deterministic/invariant tests. PostgreSQL startup UNAVAILABLE (Docker absent). |
 | 2 | Incremental/recovery/backfill | Pending |
 | 3 / 3.5 | MinIO/REST/Iceberg and real infrastructure | Pending |
 | 4 | Spark Silver | Pending |
