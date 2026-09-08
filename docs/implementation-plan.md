@@ -16,7 +16,7 @@ alone does not establish runtime acceptance.
 | 8 | GL/reconciliation | PASS: 5 actual SQL mismatch tests, including balanced GL misallocation; good data PASS. |
 | 9 | Performance | PASS: measured 1K/10K local Iceberg/Parquet. Spark/JDBC experiments implemented, runtime UNAVAILABLE. |
 | 10 / 11 | Metadata/Airflow | PASS: metadata routing tests and DAG syntax. Airflow import/runtime UNAVAILABLE. |
-| 12 | Streaming | Pending |
+| 12 | Streaming | PASS: event identity and SQL rule tests. Broker/Structured Streaming restart UNAVAILABLE. |
 | 13 / 14 | Quality/security | Pending |
 | 15 | Azure/Terraform | Pending |
 | 16 / 17 | CI/observability/BI | Pending |
