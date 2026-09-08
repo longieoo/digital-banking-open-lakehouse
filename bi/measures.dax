@@ -1,0 +1,13 @@
+-- Import into a real Power BI model using the table names in bi/README.md.
+Customers = DISTINCTCOUNT(mart_customer_360[customer_id])
+Accounts = DISTINCTCOUNT(dim_account[account_id])
+Transaction Count = COUNTROWS(fct_transactions)
+Transaction Value = SUM(fct_transactions[amount])
+Successful Transactions = CALCULATE([Transaction Count], fct_transactions[status] = "SUCCESS")
+Success Rate = DIVIDE([Successful Transactions], [Transaction Count], 0)
+Total Balance =
+    VAR LastVisibleDate = MAX(fct_account_balance_daily[business_date])
+    RETURN CALCULATE(SUM(fct_account_balance_daily[closing_balance]),
+        fct_account_balance_daily[business_date] = LastVisibleDate)
+Reconciliation Failures =
+    CALCULATE(COUNTROWS(mart_reconciliation_daily), mart_reconciliation_daily[reconciliation_status] = "FAIL")
