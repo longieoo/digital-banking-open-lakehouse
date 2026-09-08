@@ -68,6 +68,18 @@ services:
     env_file: .env
     volumes: ["./runtime:/opt/bank/runtime", "spark-ivy:/opt/spark/.ivy2"]
     mem_limit: 4g
+  trino:
+    image: trinodb/trino:475
+    profiles: [query]
+    env_file: .env
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["./query/catalog:/etc/trino/catalog:ro"]
+    healthcheck:
+      test: [CMD, trino, --execute, SELECT 1]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    mem_limit: 3g
 volumes:
   postgres-data:
   minio-data:
