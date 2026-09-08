@@ -13,7 +13,7 @@ REFERENCES = {
     'accounts': [('customer_id', 'customers', 'customer_id'), ('branch_id', 'branches', 'branch_id')],
     'transfers': [('source_account_id', 'accounts', 'account_id'),
                   ('destination_account_id', 'accounts', 'account_id')],
-    'transactions': [('account_id', 'accounts', 'account_id')],
+    'transactions': [('account_id', 'accounts', 'account_id'), ('transfer_id','transfers','transfer_id')],
     'cards': [('account_id', 'accounts', 'account_id')],
     'card_transactions': [('card_id', 'cards', 'card_id'), ('transaction_id', 'transactions', 'transaction_id')],
     'journal_entries': [('transaction_id', 'transactions', 'transaction_id')],

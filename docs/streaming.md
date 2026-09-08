@@ -20,7 +20,7 @@ and are not automatically retracted when source status changes. This is not frau
 classification or machine learning.
 
 Late events are retained and recomputed, not dropped. A ten-minute lateness audit
-compares event time to the maximum observed time. Deduplication lives in Iceberg
+compares newly observed events to the maximum from prior microbatches. Deduplication lives in Iceberg
 and survives checkpoint replay. There is no claim of bounded Spark watermark state:
 this educational implementation rescans retained history per microbatch and needs
 retention/incremental window state before high-volume use. A failed microbatch may

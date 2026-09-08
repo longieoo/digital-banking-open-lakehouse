@@ -22,8 +22,21 @@ def _consume_batch(batch, batch_number):
         'reject_id', F.sha2('raw_event',256)).dropDuplicates(['reject_id'])
     merge(rejected,'lake.quarantine.stream_events',['reject_id'],versioned=False)
     valid = batch.filter('event_id IS NOT NULL AND payload IS NOT NULL AND event_time IS NOT NULL')
+    if valid.groupBy('event_id').agg(F.countDistinct('payload').alias('versions')).filter('versions > 1').count():
+        raise ValueError('Conflicting duplicate event payload')
     valid = valid.dropDuplicates(['event_id'])
     valid = valid.withColumn('batch_number',F.lit(batch_number))
+    late = valid.limit(0)
+    if spark.catalog.tableExists('lake.silver.stream_events'):
+        previous = spark.table('lake.silver.stream_events')
+        conflicts = valid.alias('s').join(previous.alias('t'),'event_id').filter('s.payload <> t.payload')
+        if conflicts.count():
+            raise ValueError('Conflicting historical event payload')
+        new_events = valid.join(previous.select('event_id'), 'event_id', 'left_anti')
+        maximum = previous.select(F.max('event_time').alias('max_time'))
+        late = new_events.crossJoin(maximum).filter("event_time < max_time - INTERVAL 10 MINUTE").drop('max_time')
+    # Persist classification before changing its reference history; replay is idempotent.
+    merge(late,'lake.silver.late_events',['event_id'],versioned=False)
     merge(valid,'lake.silver.stream_events',['event_id'],versioned=False)
     envelopes = valid.select(
         F.get_json_object('payload','$.transaction_id').alias('record_id'),
@@ -49,11 +62,6 @@ def _consume_batch(batch, batch_number):
     alerts = spark.sql(risk_sql(os.environ.get('RISK_AMOUNT_THRESHOLD','10000.00'))).withColumn(
         'alert_id',F.sha2(F.concat_ws('|','transaction_id','rule'),256))
     merge(alerts,'lake.silver.risk_alerts',['alert_id'],versioned=False)
-    # Late observations are retained, not silently dropped by a watermark.
-    all_events = spark.table('lake.silver.stream_events')
-    maximum = all_events.select(F.max('event_time').alias('max_time'))
-    late = all_events.crossJoin(maximum).filter("event_time < max_time - INTERVAL 10 MINUTE").drop('max_time')
-    merge(late,'lake.silver.late_events',['event_id'],versioned=False)
 
 
 def main():

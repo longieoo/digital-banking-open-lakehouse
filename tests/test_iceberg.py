@@ -39,7 +39,12 @@ class IcebergTest(unittest.TestCase):
             self.assertEqual(len(bronze.table.metadata.snapshots), 2)
             self.assertGreater(bronze.table.inspect.files().num_rows, 0)
             self.assertGreater(bronze.table.inspect.manifests().num_rows, 0)
+            with bronze.table.update_spec() as update:
+                update.add_identity('source_system')
+            bronze.commit([{**row, 'record_id':'SYN-T2'}])
+            self.assertEqual(len(bronze.table.metadata.partition_specs),2)
+            self.assertEqual(bronze.table.scan(snapshot_id=int(first)).to_arrow().num_rows,1)
             restarted = load_catalog('isolated_test', **props)
-            self.assertEqual(restarted.load_table('bronze.transactions').scan().to_arrow().num_rows, 2)
+            self.assertEqual(restarted.load_table('bronze.transactions').scan().to_arrow().num_rows, 3)
             restarted.engine.dispose()
             catalog.engine.dispose()

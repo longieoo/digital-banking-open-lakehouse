@@ -19,3 +19,7 @@ class SparkTest(unittest.TestCase):
             self.assertEqual(str(parsed.schema['amount'].dataType), 'DecimalType(22,2)')
         finally:
             spark.stop()
+
+
+if __name__ == '__main__':
+    unittest.main()

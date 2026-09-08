@@ -13,6 +13,8 @@ def main():
     text=text.replace('replace-with-local-password',password).replace('replace-with-local-user',user)
     with target.open('x',encoding='utf-8') as handle:
         handle.write(text)
+    target.chmod(0o600)
+    Path('runtime').mkdir(exist_ok=True)
     print('Created ignored local .env')
 
 

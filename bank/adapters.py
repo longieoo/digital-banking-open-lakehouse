@@ -51,6 +51,7 @@ def seed_postgres(data):
     from psycopg import sql
     with psycopg.connect(connect_timeout=10) as db:
         db.execute(Path('sources/schema.sql').read_text())
+        db.execute(Path('sources/security.sql').read_text())
         for table, (schema, key) in TABLES.items():
             rows = data[table]
             if not rows:

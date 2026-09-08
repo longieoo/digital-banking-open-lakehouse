@@ -80,8 +80,9 @@ models:
   - name: account_id
     tests:
     - relationships:
-        to: ref('dim_account')
-        field: account_id
+        arguments:
+          to: ref('dim_account')
+          field: account_id
 - name: fct_transfers
   description: 'Grain: one transfer, not one transfer leg. Avoid doubling transferred
     value.'

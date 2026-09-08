@@ -90,6 +90,10 @@ services:
     - ./runtime:/opt/bank/runtime
     command:
     - manifests
+    image: banking-python:local
+    depends_on:
+      runtime-init:
+        condition: service_completed_successfully
   spark:
     build:
       context: .
@@ -101,6 +105,9 @@ services:
     - ./runtime:/opt/bank/runtime
     - spark-ivy:/opt/spark/.ivy2
     mem_limit: 4g
+    depends_on:
+      runtime-init:
+        condition: service_completed_successfully
   trino:
     image: trinodb/trino:475
     profiles:
@@ -137,6 +144,9 @@ services:
     - build
     - --profiles-dir
     - .
+    depends_on:
+      runtime-init:
+        condition: service_completed_successfully
   airflow-init:
     build: &id001
       context: .
@@ -154,6 +164,9 @@ services:
     - airflow db migrate && airflow users create --username "$${AIRFLOW_ADMIN_USER}"
       --password "$${AIRFLOW_ADMIN_PASSWORD}" --firstname Demo --lastname Admin --role
       Admin --email demo@example.invalid
+    depends_on:
+      runtime-init:
+        condition: service_completed_successfully
   airflow-scheduler:
     build: *id001
     profiles: *id002
@@ -227,6 +240,24 @@ services:
       timeout: 5s
       retries: 20
     mem_limit: 1g
+  runtime-init:
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+    image: banking-python:local
+    profiles:
+    - core
+    - processing
+    - query
+    - orchestration
+    user: 0:0
+    volumes:
+    - ./runtime:/runtime
+    entrypoint:
+    - python
+    - -c
+    command:
+    - import os; os.chown('/runtime', 50000, 0); os.chmod('/runtime', 0o770)
 volumes:
   postgres-data: null
   minio-data: null

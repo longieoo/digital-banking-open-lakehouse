@@ -60,3 +60,26 @@ CREATE TABLE IF NOT EXISTS gl.journal_lines (
 CREATE TABLE IF NOT EXISTS core.source_totals (
  total_id text PRIMARY KEY, business_date date NOT NULL, currency char(3) NOT NULL,
  source_count bigint NOT NULL, source_amount numeric(22,2) NOT NULL, updated_at timestamptz NOT NULL);
+
+-- Operational updates must not reuse an already observed source version.
+CREATE OR REPLACE FUNCTION core.ensure_update_version() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW IS DISTINCT FROM OLD AND NEW.updated_at <= OLD.updated_at THEN
+   NEW.updated_at := greatest(clock_timestamp(), OLD.updated_at + interval '1 microsecond');
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS transaction_version ON core.transactions;
+CREATE TRIGGER transaction_version BEFORE UPDATE ON core.transactions
+ FOR EACH ROW EXECUTE FUNCTION core.ensure_update_version();
+DROP TRIGGER IF EXISTS customer_version ON core.customers;
+CREATE TRIGGER customer_version BEFORE UPDATE ON core.customers
+ FOR EACH ROW EXECUTE FUNCTION core.ensure_update_version();
+CREATE OR REPLACE FUNCTION core.capture_customer_history() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ INSERT INTO core.customer_history SELECT NEW.* ON CONFLICT(customer_id,updated_at) DO NOTHING;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS customer_history_capture ON core.customers;
+CREATE TRIGGER customer_history_capture AFTER INSERT OR UPDATE ON core.customers
+ FOR EACH ROW EXECUTE FUNCTION core.capture_customer_history();

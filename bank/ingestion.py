@@ -105,6 +105,12 @@ class FileRaw:
                 handle.flush()
                 os.fsync(handle.fileno())
             temporary.replace(path)
+            if os.name != 'nt':
+                directory = os.open(path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
         if path.read_bytes() != content:
             raise IOError("Raw verification failed")
 

@@ -79,10 +79,18 @@ def process_table(spark, table):
     from pyspark.sql import functions as F, Window
     frame = parse_frame(spark.table(f'lake.bronze.{table}'), table)
     for col, parent, parent_key in REFERENCES.get(table, []):
-        ref = spark.table(f'lake.silver.{parent}').select(F.col(parent_key).alias('_ref')).distinct()
+        parent_frame = spark.table(f'lake.silver.{parent}')
+        currency_check = 'currency' in frame.columns and 'currency' in parent_frame.columns
+        ref_columns = [F.col(parent_key).alias('_ref')]
+        if currency_check:
+            ref_columns.append(F.col('currency').alias('_ref_currency'))
+        ref = parent_frame.select(*ref_columns).distinct()
         frame = frame.join(ref, frame[col] == ref['_ref'], 'left').withColumn('reject_reason',
-            F.concat_ws(';', F.col('reject_reason'), F.when(F.col('_ref').isNull(), F.lit(f'{col}:orphan'))))
-        frame = frame.drop('_ref')
+            F.concat_ws(';', F.col('reject_reason'), F.when(F.col('_ref').isNull() & F.col(col).isNotNull(), F.lit(f'{col}:orphan'))))
+        if currency_check:
+            frame = frame.withColumn('reject_reason', F.concat_ws(';', 'reject_reason',
+                F.when(F.col('currency') != F.col('_ref_currency'), F.lit(f'{col}:currency_mismatch'))))
+        frame = frame.drop('_ref', '_ref_currency')
     if table == 'transactions':
         candidates = frame.filter("reject_reason = ''").withColumn('_rn', F.row_number().over(
             Window.partitionBy('transaction_id').orderBy(F.col('updated_at').desc())))

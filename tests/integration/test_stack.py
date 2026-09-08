@@ -28,6 +28,11 @@ class RealStackTest(unittest.TestCase):
             snapshot=bronze.table.current_snapshot().snapshot_id
             run()
             self.assertEqual(bronze.table.current_snapshot().snapshot_id,snapshot)
+            import psycopg
+            with psycopg.connect() as db:
+                db.execute("UPDATE core.transactions SET channel='ATM', updated_at=updated_at + interval '45 days' "
+                           "WHERE transaction_id='SYN-T000000001'")
+            self.assertEqual(run()['count'],1)
             before=state.watermark('core.transactions')
             run(dates=('2026-01-01','2026-01-07'))
             self.assertEqual(state.watermark('core.transactions'),before)
