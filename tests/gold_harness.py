@@ -4,6 +4,7 @@ This tests business SQL against typed fixture Silver. It is NOT a Spark/Trino E2
 """
 from pathlib import Path
 import re
+import json
 from bank.contracts import fields, column_type
 from bank.generator import generate
 
@@ -14,6 +15,7 @@ class GoldHarness:
         self.db = duckdb.connect()
         self.db.execute('CREATE SCHEMA silver')
         self.db.execute('CREATE SCHEMA gold')
+        self.db.execute('CREATE SCHEMA bronze')
         self.data = generate(customers=8, transactions=100) if data is None else data
         for table, rows in self.data.items():
             cols = fields(table)
@@ -21,6 +23,10 @@ class GoldHarness:
             self.db.execute(f'CREATE TABLE silver.{table} ({definitions})')
             self.db.executemany(f'INSERT INTO silver.{table} VALUES ({",".join("?" for c in cols)})',
                                [tuple(row[c] for c in cols) for row in rows])
+
+        self.db.execute('CREATE TABLE bronze.transactions (record_id varchar, source_updated_at varchar, business_date varchar, payload varchar)')
+        self.db.executemany('INSERT INTO bronze.transactions VALUES (?,?,?,?)',
+            [(r['transaction_id'],r['updated_at'],r['business_date'],json.dumps(r)) for r in self.data['transactions']])
 
     def render(self, path):
         import jinja2

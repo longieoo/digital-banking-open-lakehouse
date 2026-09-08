@@ -16,6 +16,11 @@ sources:
   - name: journal_entries
   - name: journal_lines
   - name: source_totals
+- name: bronze
+  database: lake
+  schema: bronze
+  tables:
+  - name: transactions
 models:
 - name: dim_customer
   description: 'Grain: one contiguous business-attribute interval per customer, [valid_from,

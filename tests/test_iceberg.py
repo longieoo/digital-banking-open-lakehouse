@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import os
+from contextlib import ExitStack
 import unittest
 
 
@@ -11,11 +13,13 @@ class IcebergTest(unittest.TestCase):
         from pyiceberg.catalog import load_catalog
         from pyiceberg.types import StringType
         from bank.adapters import IcebergBronze
-        with tempfile.TemporaryDirectory() as tmp:
+        with ExitStack() as stack:
+            tmp = stack.enter_context(tempfile.TemporaryDirectory())
             root = Path(tmp)
             props = {'type': 'sql', 'uri': 'sqlite:///' + (root/'catalog.db').as_posix(),
-                     'warehouse': (root/'warehouse').as_uri()}
+                     'warehouse': Path(os.path.relpath(root/'warehouse')).as_posix()}
             catalog = load_catalog('isolated_test', **props)
+            stack.callback(catalog.engine.dispose)
             bronze = IcebergBronze(catalog, 'transactions')
             row = dict(record_id='SYN-T1', source_updated_at='2026-01-01T00:00:00Z',
                 business_date='2026-01-01', payload='{"amount":"2.00"}', batch_id='batch1',
