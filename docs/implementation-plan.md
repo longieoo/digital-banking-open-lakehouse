@@ -17,7 +17,7 @@ alone does not establish runtime acceptance.
 | 9 | Performance | PASS: measured 1K/10K local Iceberg/Parquet. Spark/JDBC experiments implemented, runtime UNAVAILABLE. |
 | 10 / 11 | Metadata/Airflow | PASS: metadata routing tests and DAG syntax. Airflow import/runtime UNAVAILABLE. |
 | 12 | Streaming | PASS: event identity and SQL rule tests. Broker/Structured Streaming restart UNAVAILABLE. |
-| 13 / 14 | Quality/security | Pending |
+| 13 / 14 | Quality/security | PASS: 30 executed tests, lint, masking/rules and fixture checks. 2 service tests SKIPPED for unavailable runtime. |
 | 15 | Azure/Terraform | Pending |
 | 16 / 17 | CI/observability/BI | Pending |
 | 18 | Portfolio freeze | Pending |

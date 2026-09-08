@@ -17,3 +17,6 @@ dbt/dbt_packages/
 *.pem
 *.key
 *.log
+
+*.plan
+crash.log

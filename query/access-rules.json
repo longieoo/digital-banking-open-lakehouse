@@ -1,0 +1,16 @@
+{
+  "catalogs": [
+    {"user":"transformer", "catalog":"lake", "allow":"all"},
+    {"user":"analyst", "catalog":"lake", "allow":"read-only"},
+    {"catalog":"system", "allow":"read-only"}
+  ],
+  "schemas": [
+    {"user":"transformer", "schema":".*", "owner":true},
+    {"user":"analyst", "schema":"gold", "owner":false}
+  ],
+  "tables": [
+    {"user":"transformer", "privileges":["SELECT","INSERT","DELETE","UPDATE","OWNERSHIP","GRANT_SELECT"]},
+    {"user":"analyst", "schema":"gold", "privileges":["SELECT"]},
+    {"privileges":[]}
+  ]
+}

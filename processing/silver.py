@@ -1,7 +1,7 @@
 """Real Spark Bronze -> Silver. Invoke with spark-submit from repository root."""
 import os
 from bank.adapters import TABLES
-from bank.contracts import fields, column_type, primary_key, REFERENCES, NULLABLE, CREDIT_TYPES, DEBIT_TYPES
+from bank.contracts import fields, column_type, primary_key, REFERENCES, NULLABLE, CREDIT_TYPES, DEBIT_TYPES, DECIMALS
 
 
 def session():
@@ -31,6 +31,8 @@ def parse_frame(bronze, table):
     frame = parsed.select('r.*', 'payload', 'batch_id')
     errors = []
     for col in fields(table):
+        if col in DECIMALS:
+            errors.append(F.when(~F.get_json_object('payload', f'$.{col}').rlike(r'^-?[0-9]+(\.[0-9]{1,2})?$'), F.lit(f'{col}:invalid_scale')))
         frame = frame.withColumn(col, F.expr(f'try_cast(`{col}` as {column_type(col)})'))
         if col not in NULLABLE:
             errors.append(F.when(F.col(col).isNull(), F.lit(f'{col}:required_or_invalid')))
