@@ -1,0 +1,13 @@
+banking:
+  target: local
+  outputs:
+    local:
+      type: trino
+      method: none
+      user: "{{ env_var('TRINO_USER', 'transformer') }}"
+      host: "{{ env_var('TRINO_HOST', 'localhost') }}"
+      port: "{{ env_var('TRINO_PORT', '8080') | int }}"
+      database: lake
+      schema: gold
+      threads: 2
+      http_scheme: http

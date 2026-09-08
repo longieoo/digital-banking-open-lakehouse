@@ -1,0 +1,17 @@
+name: banking
+version: '1.0.0'
+config-version: 2
+profile: banking
+model-paths: [models]
+test-paths: [tests]
+macro-paths: [macros]
+vars:
+  as_of_date: '2026-01-31'
+  start_date: '2026-01-01'
+  reporting_currency: USD
+models:
+  banking:
+    +materialized: table
+    +properties:
+      format: "'PARQUET'"
+      format_version: '2'

@@ -1,0 +1,105 @@
+version: 2
+sources:
+- name: silver
+  database: lake
+  schema: silver
+  tables:
+  - name: branches
+  - name: customers
+  - name: customer_history
+  - name: accounts
+  - name: transfers
+  - name: transactions
+  - name: cards
+  - name: card_transactions
+  - name: gl_accounts
+  - name: journal_entries
+  - name: journal_lines
+  - name: source_totals
+models:
+- name: dim_customer
+  description: 'Grain: one contiguous business-attribute interval per customer, [valid_from,
+    valid_to).'
+  columns:
+  - name: customer_sk
+    tests:
+    - unique
+    - not_null
+- name: dim_account
+  description: 'Grain: one current account; initial balance is zero by source contract.'
+  columns:
+  - name: account_id
+    tests:
+    - unique
+    - not_null
+- name: dim_card
+  description: 'Grain: one synthetic card identifier; no payment credentials exist.'
+  columns:
+  - name: card_id
+    tests:
+    - unique
+    - not_null
+- name: dim_branch
+  description: 'Grain: one branch.'
+  columns:
+  - name: branch_id
+    tests:
+    - unique
+    - not_null
+- name: dim_transaction_type
+  description: 'Grain: one transaction type and its posting direction.'
+  columns:
+  - name: transaction_type
+    tests:
+    - unique
+    - not_null
+- name: dim_date
+  description: 'Grain: one calendar date. start_date must cover the complete zero-opening
+    ledger.'
+  columns:
+  - name: business_date
+    tests:
+    - unique
+    - not_null
+- name: fct_transactions
+  description: 'Grain: one latest valid core transaction event. Reversals are separate
+    events.'
+  columns:
+  - name: transaction_id
+    tests:
+    - unique
+    - not_null
+  - name: customer_sk
+    tests:
+    - not_null
+  - name: account_id
+    tests:
+    - relationships:
+        to: ref('dim_account')
+        field: account_id
+- name: fct_transfers
+  description: 'Grain: one transfer, not one transfer leg. Avoid doubling transferred
+    value.'
+  columns:
+  - name: transfer_id
+    tests:
+    - unique
+    - not_null
+- name: fct_card_transactions
+  description: 'Grain: one card purchase event; do not add its amount again to core
+    balances.'
+  columns:
+  - name: card_transaction_id
+    tests:
+    - unique
+    - not_null
+- name: mart_customer_360
+  description: 'Grain: one customer, reporting_currency only for monetary measures;
+    explicit as-of date.'
+  columns:
+  - name: customer_id
+    tests:
+    - unique
+    - not_null
+- name: fct_account_balance_daily
+  description: 'Grain: account per calendar date. Currency native; zero initial balance.'
