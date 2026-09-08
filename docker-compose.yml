@@ -133,8 +133,66 @@ services:
     - build
     - --profiles-dir
     - .
+  airflow-init:
+    build: &id001
+      context: .
+      dockerfile: docker/airflow.Dockerfile
+    profiles: &id002
+    - orchestration
+    env_file: .env
+    volumes: &id003
+    - airflow-data:/opt/airflow
+    - ./runtime:/opt/bank/runtime
+    mem_limit: 4g
+    command:
+    - bash
+    - -ec
+    - airflow db migrate && airflow users create --username "$${AIRFLOW_ADMIN_USER}"
+      --password "$${AIRFLOW_ADMIN_PASSWORD}" --firstname Demo --lastname Admin --role
+      Admin --email demo@example.invalid
+  airflow-scheduler:
+    build: *id001
+    profiles: *id002
+    env_file: .env
+    volumes: *id003
+    mem_limit: 4g
+    command:
+    - scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - airflow jobs check --job-type SchedulerJob --local
+      interval: 30s
+      timeout: 15s
+      retries: 10
+  airflow-webserver:
+    build: *id001
+    profiles: *id002
+    env_file: .env
+    volumes: *id003
+    mem_limit: 4g
+    command:
+    - webserver
+    ports:
+    - 127.0.0.1:8081:8080
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080/health
+      interval: 30s
+      timeout: 10s
+      retries: 10
 volumes:
   postgres-data: null
   minio-data: null
   catalog-data: null
   spark-ivy: null
+  airflow-data: null

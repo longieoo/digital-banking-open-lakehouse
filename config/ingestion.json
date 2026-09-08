@@ -1,0 +1,134 @@
+[
+  {
+    "source_system": "core",
+    "source_table": "branches",
+    "target_table": "bronze.branches",
+    "primary_key": "branch_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "customers",
+    "target_table": "bronze.customers",
+    "primary_key": "customer_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "customer_history",
+    "target_table": "bronze.customer_history",
+    "primary_key": "customer_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "accounts",
+    "target_table": "bronze.accounts",
+    "primary_key": "account_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "transfers",
+    "target_table": "bronze.transfers",
+    "primary_key": "transfer_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "transactions",
+    "target_table": "bronze.transactions",
+    "primary_key": "transaction_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "card",
+    "source_table": "cards",
+    "target_table": "bronze.cards",
+    "primary_key": "card_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "card",
+    "source_table": "card_transactions",
+    "target_table": "bronze.card_transactions",
+    "primary_key": "card_transaction_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "gl",
+    "source_table": "gl_accounts",
+    "target_table": "bronze.gl_accounts",
+    "primary_key": "gl_account_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "gl",
+    "source_table": "journal_entries",
+    "target_table": "bronze.journal_entries",
+    "primary_key": "entry_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "gl",
+    "source_table": "journal_lines",
+    "target_table": "bronze.journal_lines",
+    "primary_key": "line_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  },
+  {
+    "source_system": "core",
+    "source_table": "source_totals",
+    "target_table": "bronze.source_totals",
+    "primary_key": "total_id",
+    "incremental_key": "updated_at",
+    "partition_column": "business_date",
+    "load_strategy": "versioned_incremental",
+    "batch_size": 10000,
+    "enabled": true
+  }
+]
