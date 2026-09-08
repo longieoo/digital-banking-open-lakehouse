@@ -1,0 +1,15 @@
+a27208a chore: bootstrap banking lakehouse repository
+cb156d2 feat: establish constrained synthetic banking sources
+554cf51 feat: add failure-safe incremental ingestion and backfill
+d6838f2 feat: establish persistent MinIO REST Iceberg Bronze adapters
+6026d37 feat: implement Spark Silver conformance and quarantine
+670ca1c feat: expose Iceberg through Trino
+0461627 feat: build dbt banking dimensions facts and Customer 360
+a19997b feat: reconcile source Bronze Gold and per-posting GL
+05da0b3 perf: measure local Iceberg and add Spark JDBC experiments
+ec8154a feat: add metadata ingestion and data-aware Airflow DAGs
+b79cec3 feat: add Redpanda streaming and tested transaction risk rules
+36480da test: strengthen quality security and real-stack acceptance gates
+dd55a68 feat: provision validated Azure ADLS and Key Vault infrastructure
+8ebe8f3 ci: add validation monitoring and Power BI serving specification
+32b93e1 fix: harden conformance runtime ownership and late-event classification

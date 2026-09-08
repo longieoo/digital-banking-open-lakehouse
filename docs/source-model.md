@@ -18,3 +18,7 @@ size. Generator memory is O(n); large runs need adequate RAM.
 PostgreSQL enforces keys, FKs, positive amounts, enums and transfer inequality.
 Cross-row GL balancing is tested and reconciled downstream; it is not a SQL CHECK.
 Controlled duplicates, negative amounts and late updates are separate fixtures.
+
+PostgreSQL triggers advance transaction/customer updated_at on changed rows and
+capture customer inserts/updates into source history. These triggers are included
+in the real source schema; their execution remains part of the Docker gate.

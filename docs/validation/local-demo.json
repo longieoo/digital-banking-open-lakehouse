@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "scope": "Real local Iceberg; typed fixture Silver; actual dbt SQL via DuckDB. NOT distributed E2E.",
+  "source_events": 113,
+  "iceberg_versions": 113,
+  "gold_events": 113,
+  "customer_360_rows": 8,
+  "balance_rows": 248,
+  "reconciliation_failures": 0,
+  "recovery_metrics": {
+    "completed_batches": 1,
+    "failed_batches": 0,
+    "started_batches": 0,
+    "rows_extracted": 113,
+    "rows_written": 113,
+    "retry_count": 1,
+    "total_attempt_elapsed_seconds": 0.573554,
+    "measured_at": "2026-09-08T01:21:24.664546+00:00",
+    "manifest_count_mismatches": 0
+  }
+}

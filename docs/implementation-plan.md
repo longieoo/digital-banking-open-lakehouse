@@ -17,10 +17,11 @@ alone does not establish runtime acceptance.
 | 9 | Performance | PASS: measured 1K/10K local Iceberg/Parquet. Spark/JDBC experiments implemented, runtime UNAVAILABLE. |
 | 10 / 11 | Metadata/Airflow | PASS: metadata routing tests and DAG syntax. Airflow import/runtime UNAVAILABLE. |
 | 12 | Streaming | PASS: event identity and SQL rule tests. Broker/Structured Streaming restart UNAVAILABLE. |
-| 13 / 14 | Quality/security | PASS: 30 executed tests, lint, masking/rules and fixture checks. 2 service tests SKIPPED for unavailable runtime. |
+| 13 / 14 | Quality/security | PASS: 33 executed tests, lint, masking/rules and fixture checks. 2 service tests SKIPPED for unavailable runtime. |
 | 15 | Azure/Terraform | PASS: Terraform 1.11.4 init, fmt and validate with AzureRM 4.26.0. Azure plan/apply UNAVAILABLE (no credentials). |
 | 16 / 17 | CI/observability/BI | PASS: workflow YAML and monitoring code checks. CI hosted run / Power BI GUI UNAVAILABLE; DAX and semantic specification supplied. |
-| 18 | Portfolio freeze | Pending |
+| 18 | Portfolio freeze | Docs/ADRs/diagrams and final local checks PASS; clean-clone gate in progress. |
 
-Environment discovery: bundled Python 3.12 and Git available. Docker executable,
-Java and Terraform not found. No live infrastructure or Azure deployment claimed.
+Environment discovery: Python 3.12 and Git available; Docker daemon/Java absent.
+Terraform was subsequently downloaded and verified; init/fmt/validate PASS.
+No live infrastructure or Azure deployment is claimed. See validation/local-tests.json.
