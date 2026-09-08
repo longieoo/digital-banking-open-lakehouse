@@ -1,0 +1,9 @@
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=https://replace-with-authenticated-rest-catalog
+iceberg.rest-catalog.vended-credentials-enabled=false
+fs.native-azure.enabled=true
+azure.auth-type=OAUTH
+azure.oauth.tenant-id=${ENV:AZURE_TENANT_ID}
+azure.oauth.client-id=${ENV:AZURE_CLIENT_ID}
+azure.oauth.secret=${ENV:AZURE_CLIENT_SECRET}

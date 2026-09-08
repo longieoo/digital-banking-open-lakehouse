@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-runtime = ["psycopg[binary]==3.2.9", "boto3==1.38.46", "pyiceberg[pyarrow]==0.9.1", "azure-storage-blob==12.25.1", "azure-identity==1.23.0"]
+runtime = ["psycopg[binary]==3.2.9", "boto3==1.38.46", "pyiceberg[pyarrow]==0.9.1", "azure-storage-blob==12.25.1", "azure-identity==1.23.0", "adlfs==2024.12.0"]
 dev = ["ruff==0.11.13", "PyYAML==6.0.2"]
 streaming = ["confluent-kafka==2.10.0"]
 

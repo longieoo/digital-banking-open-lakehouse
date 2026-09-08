@@ -1,0 +1,5 @@
+subscription_id       = "00000000-0000-0000-0000-000000000000"
+storage_account_name  = "replaceuniquebankdemo"
+pipeline_principal_id = "00000000-0000-0000-0000-000000000000"
+allowed_ipv4          = ["203.0.113.10"] # Documentation-only address: replace with your public egress IP.
+location              = "southeastasia"

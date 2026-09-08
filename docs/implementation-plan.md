@@ -18,7 +18,7 @@ alone does not establish runtime acceptance.
 | 10 / 11 | Metadata/Airflow | PASS: metadata routing tests and DAG syntax. Airflow import/runtime UNAVAILABLE. |
 | 12 | Streaming | PASS: event identity and SQL rule tests. Broker/Structured Streaming restart UNAVAILABLE. |
 | 13 / 14 | Quality/security | PASS: 30 executed tests, lint, masking/rules and fixture checks. 2 service tests SKIPPED for unavailable runtime. |
-| 15 | Azure/Terraform | Pending |
+| 15 | Azure/Terraform | PASS: Terraform 1.11.4 init, fmt and validate with AzureRM 4.26.0. Azure plan/apply UNAVAILABLE (no credentials). |
 | 16 / 17 | CI/observability/BI | Pending |
 | 18 | Portfolio freeze | Pending |
 
