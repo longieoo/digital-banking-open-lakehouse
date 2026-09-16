@@ -49,3 +49,42 @@ No live infrastructure or Azure deployment is claimed. See validation/local-test
   settings were not changed. No Docker factory reset or volume removal was done.
 - Next gate: restore a working Docker Desktop Linux engine, then rerun the
   distributed batch commands in docs/demo.md and scripts/e2e.py.
+
+## Distributed local validation — 2026-09-16/17
+
+This later run supersedes the earlier local Docker UNAVAILABLE status above;
+historical artifacts retain their original results.
+
+- PASS: PostgreSQL, MinIO, REST catalog, Trino, Redpanda and Airflow scheduler/webserver
+  start with healthy service checks. The Docker engine was available on the resumed
+  run; no Docker reset or removal of data volumes was needed.
+- PASS: all 12 source tables through raw/Bronze and Spark Silver, with zero rejected
+  source rows; 225 transaction business events, 20 Customer 360 rows and 620 balances.
+- PASS: dbt on live Trino, 14 table models and 31 data tests. All 30 reconciliation
+  day/currency rows pass, covering 225 source and Gold transactions.
+- PASS: the final expanded scripts/e2e.py run builds/tests Gold both before and
+  after restarting catalog/MinIO (45/45 on each build), verifies unchanged Bronze
+  counts and rechecks reconciliation. See validation/docker-tests.json.
+- PASS: real PostgreSQL/MinIO/REST failure/retry, no-op replay, version update,
+  backfill and snapshot integration test. The Spark integration test verifies exact
+  decimal typing, quarantine and all three risk rules, including threshold boundaries.
+- PASS: Redpanda delivers 230 messages representing 225 unique events. Restarting
+  the consumer with the same checkpoint and replaying the producer preserves 225
+  unique events and 226 Bronze versions (one additional version is intentional in
+  the recovery integration test). Default demo risk alerts remain zero.
+- PASS: Airflow Bronze succeeded and triggered Silver through a Dataset; Silver
+  succeeded and triggered Gold. Gold initially failed on a SQLite catalog lock,
+  then passed all 45 dbt steps after the catalog fix and retry.
+- PASS: local unit/contract checks, Ruff, compilation, Compose configuration,
+  Airflow DAG import, both Airflow/dbt dependency checks and analyst Gold-only access.
+- PASS: Terraform 1.11.4 fmt/init/validate with AzureRM 4.26.0 in a Linux container;
+  the lock file now includes the verified Linux/provider registry checksums.
+- External boundaries: FX fixture ingestion passes; the live API still returns
+  HTTP 403. Azure plan/apply/identity and an actual Power BI Desktop artifact remain
+  unvalidated and are not claimed as local-stack completion.
+
+Fixes are documented in [ADR 007](adr/007-local-runtime-compatibility.md): catalog
+volume permissions and a single JDBC client, Spark's writable persistent Ivy cache,
+deferred shared annotations for the pinned Spark image, isolated Airflow/dbt
+dependencies and matching aiobotocore, and health/write-after-restart E2E gates.
+No financial transformations or dependency versions of standalone dbt were changed.

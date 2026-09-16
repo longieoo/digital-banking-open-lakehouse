@@ -35,4 +35,4 @@ with DAG('bank_silver',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedul
 with DAG('bank_gold',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule=[SILVER],
          catchup=False,max_active_runs=1,default_args=DEFAULTS,tags=['banking']) as gold_dag:
     BashOperator(task_id='dbt_build_and_quality',cwd='/opt/bank/dbt',
-                 bash_command='dbt build --profiles-dir .')
+                 bash_command='/opt/bank/dbt-venv/bin/dbt build --profiles-dir .')

@@ -38,6 +38,12 @@ container does not depend on every service so it can run standalone utilities.
 Wait for PostgreSQL and catalog health before seeding/ingestion. Maven artifacts
 download on first Spark run and persist in the Ivy volume.
 
+`catalog-init` grants the catalog image's UID 1000 access to the named catalog
+volume before REST starts. Spark explicitly uses `/opt/spark/.ivy2` for dependency
+downloads. Keep these initialization dependencies when starting from fresh volumes.
+The local SQLite-backed REST catalog uses `CATALOG_CLIENTS=1` to serialize JDBC
+access; removing this setting can leave writes locked after catalog restart.
+
 Profiles: core = source/Python utilities; lakehouse = MinIO/bucket init/REST;
 processing = on-demand Spark; query = Trino/on-demand dbt; streaming = Redpanda;
 orchestration = Airflow init/scheduler/webserver. Run only needed named services.
@@ -92,6 +98,11 @@ and source audit totals before reconciliation can PASS.
 Read credentials from local .env. Check `airflow dags list-import-errors`, unpause
 bank_bronze and trigger it; Dataset success schedules Silver then Gold. Startup is
 one-time initialization; preserve airflow-data for subsequent starts.
+
+Unpause `bank_silver` and `bank_gold` as well so Dataset events can schedule them.
+The Gold task uses `/opt/bank/dbt-venv/bin/dbt`, isolated from Airflow dependencies.
+Run `docker compose exec airflow-scheduler python -m pip check` to verify the
+Airflow environment after rebuilding its image.
 
 `docker compose run --rm --entrypoint python bank -m bank.external` loads the labeled
 offline FX fixture. Add --live only when endpoint access is available. BI serving

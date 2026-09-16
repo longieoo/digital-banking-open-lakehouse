@@ -16,7 +16,7 @@ def query(sql):
 def main():
     if not Path('.env').exists():
         raise SystemExit('Create local .env from .env.example first')
-    run('docker','compose','--profile','core','--profile','lakehouse','up','-d','postgres','catalog')
+    run('docker','compose','--profile','core','--profile','lakehouse','up','-d','--wait','postgres','catalog')
     run('docker','compose','build','bank','spark','dbt')
     run('docker','compose','run','--rm','bank','seed')
     run('docker','compose','run','--rm','--entrypoint','python','bank','-m','bank.pipeline')
@@ -31,6 +31,10 @@ def main():
     run('docker','compose','restart','catalog','minio')
     run('docker','compose','--profile','lakehouse','up','-d','--wait','catalog','minio')
     assert query('SELECT count(*) FROM lake.bronze.transactions')==count
+    # Reading after restart is insufficient: SQLite JDBC locks can block writes
+    # while all health checks and SELECT queries still succeed.
+    run('docker','compose','run','--rm','dbt','build','--profiles-dir','.')
+    assert query("SELECT count(*) FROM lake.gold.mart_reconciliation_daily WHERE reconciliation_status='FAIL'")=='0'
     print('PASS: real source -> Bronze -> Spark Silver -> dbt Gold, recovery, reconciliation, restart persistence')
 
 

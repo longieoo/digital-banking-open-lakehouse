@@ -23,7 +23,9 @@ demo, including source → Bronze → Spark Silver → dbt Gold, recovery, recon
 and storage/catalog restart. This seeds SYN records: use the dedicated Compose
 project, not an unrelated database. It leaves services running for inspection;
 `docker compose --profile core --profile lakehouse --profile query down` stops them
-without removing volumes. Docker gate was UNAVAILABLE in authoring.
+without removing volumes. Docker acceptance now passes locally (2026-09-16/17).
+The gate rebuilds dbt after restart as well: readable metadata alone does not prove
+the restarted catalog accepts writes.
 
 Spark integration: run `tests/integration/test_spark.py` with RUN_SPARK=1 through
 spark-submit or in a configured Java/Spark environment. PostgreSQL/MinIO/REST:

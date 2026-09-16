@@ -1,0 +1,104 @@
+{
+  "validated_at_utc": "2026-09-16T18:43:08.424419+00:00",
+  "scope": "Local Docker synthetic-data acceptance; not Azure or Power BI Desktop acceptance",
+  "status": "PASS",
+  "python_tests": {
+    "discovered": 35,
+    "passed_locally": 33,
+    "gated_tests_run_separately": 2
+  },
+  "real_stack_integration": "PASS",
+  "spark_integration_and_three_risk_rules": "PASS",
+  "e2e_including_gold_write_after_restart": "PASS",
+  "dbt_before_and_after_restart": {
+    "runs": 2,
+    "models_per_run": 14,
+    "data_tests_per_run": 31,
+    "errors": 0
+  },
+  "airflow": {
+    "bank_bronze": {
+      "dag_id": "bank_bronze",
+      "run_id": "scheduled__2026-09-15T02:00:00+00:00",
+      "state": "success",
+      "execution_date": "2026-09-15T02:00:00+00:00",
+      "start_date": "2026-09-16T12:30:57.838267+00:00",
+      "end_date": "2026-09-16T12:31:07.469150+00:00"
+    },
+    "bank_silver": {
+      "dag_id": "bank_silver",
+      "run_id": "dataset_triggered__2026-09-16T12:31:06.271797+00:00",
+      "state": "success",
+      "execution_date": "2026-09-16T12:31:06.271797+00:00",
+      "start_date": "2026-09-16T12:31:07.457962+00:00",
+      "end_date": "2026-09-16T12:32:26.793957+00:00"
+    },
+    "bank_gold": {
+      "dag_id": "bank_gold",
+      "run_id": "dataset_triggered__2026-09-16T12:32:25.342985+00:00",
+      "state": "success",
+      "execution_date": "2026-09-16T12:32:25.342985+00:00",
+      "start_date": "2026-09-16T17:57:09.010434+00:00",
+      "end_date": "2026-09-16T18:20:12.568446+00:00"
+    }
+  },
+  "services": [
+    {
+      "Service": "airflow-scheduler",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "airflow-webserver",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "catalog",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "minio",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "postgres",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "redpanda",
+      "State": "running",
+      "Health": "healthy"
+    },
+    {
+      "Service": "trino",
+      "State": "running",
+      "Health": "healthy"
+    }
+  ],
+  "gold": {
+    "transactions": 225,
+    "customer_360": 20,
+    "daily_balances": 620,
+    "reconciliation_days": 30,
+    "reconciliation_failures": 0
+  },
+  "streaming": {
+    "messages_per_delivery": 230,
+    "unique_events": 225,
+    "bronze_versions_before_and_after_replay": 226,
+    "restart_and_replay": "PASS",
+    "default_fixture_alerts": 0
+  },
+  "analyst_gold_only_access": "PASS",
+  "terraform_fmt_init_validate": "PASS",
+  "airflow_and_dbt_dependency_checks": "PASS",
+  "external_boundaries": {
+    "live_fx_api": "HTTP 403; fixture ingestion PASS",
+    "azure_deployment": "NOT RUN",
+    "power_bi_desktop_artifact": "NOT IMPLEMENTED in repository"
+  }
+}

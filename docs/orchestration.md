@@ -21,5 +21,7 @@ The resource-aware local Airflow demo uses SequentialExecutor and persistent SQL
 metadata. It is intentionally single-host; use a separate metadata PostgreSQL for
 multi-worker deployment. No Docker socket is exposed to Airflow. Its image includes
 Spark and dbt clients; it starts jobs rather than hosting business transformations.
-Airflow image build, DAG import and scheduled execution need Linux/Docker and remain
-UNAVAILABLE here. Run `airflow dags list-import-errors` before enabling schedules.
+Airflow image build, DAG import and Dataset-triggered Bronze → Silver → Gold were
+validated locally on 2026-09-16/17. dbt runs in `/opt/bank/dbt-venv` to isolate its
+dependencies from Airflow. Unpause all three DAGs; downstream Dataset DAGs are
+initially paused too. Run `airflow dags list-import-errors` before enabling schedules.

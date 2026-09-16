@@ -7,11 +7,13 @@ The central question: **can a pipeline fail, retry and backfill without losing o
 ## Validation at a glance
 
 - **PASS:** source invariants; ingestion recovery/backfill; real local Iceberg snapshots, time travel, schema evolution and reopen; actual Gold SQL business tests; reconciliation mismatch detection; dbt parsing; lint; Terraform init/fmt/validate.
-- **UNAVAILABLE:** authoring-machine Docker/Java; deployed PostgreSQL/MinIO/REST/Spark/Trino/Airflow/Redpanda acceptance; Azure deployment; Power BI Desktop.
+- **PASS (local Docker, 2026-09-16/17):** PostgreSQL/MinIO/REST recovery and backfill; Spark Silver and risk SQL; Trino/dbt (14 models + 31 data tests); streaming replay/checkpoint restart; Airflow Bronze → Silver → Gold; catalog/storage restart persistence.
+- **UNAVAILABLE:** Azure deployment and Power BI Desktop artifact validation.
 - **Explicit substitute:** Gold tests run the actual dbt SQL through DuckDB translation against typed fixture Silver. This is not distributed E2E. The public FX endpoint returned HTTP 403; its fixture is labeled.
 
 See the [validation ledger](docs/implementation-plan.md), [test boundaries](docs/testing.md) and [known limitations](docs/limitations.md). Code existence is not runtime validation. Fresh-clone local tests pass; a fresh
-Terraform initialization hit a local file-access error, documented in the report.
+Terraform initialization previously hit a local file-access error; a Linux-container
+recheck now passes init/fmt/validate. Historical reports retain their original results.
 
 ## Architecture
 
@@ -85,7 +87,7 @@ docker compose --profile query up -d --wait trino
 docker compose run --rm dbt build --profiles-dir .
 ```
 
-The [full runbook](docs/demo.md) covers clean clone, profiles, failure/retry, backfill, snapshots, streaming and Airflow. `python scripts/e2e.py` is the opt-in real-stack acceptance gate; it could not run in authoring.
+The [full runbook](docs/demo.md) covers clean clone, profiles, failure/retry, backfill, snapshots, streaming and Airflow. `python scripts/e2e.py` is the opt-in real-stack acceptance gate, including Gold writes after catalog restart.
 
 ## Reliability and quality
 
@@ -120,4 +122,4 @@ CI checks lint, contracts, local Iceberg, SQL, dbt parsing, Compose and Terrafor
 
 Repository modules: bank/ and sources/ for source/ingestion contracts; processing/ for Spark; dbt/ for Gold; streaming/, orchestration/, query/, infra/terraform/, tests/, benchmarks/, monitoring/, bi/ and docs/. No runtime data or Terraform state belongs in Git.
 
-Next priorities are real Docker acceptance, measured Spark tuning, cloud identity validation and a genuine BI dashboard—not more technologies.
+Next priorities are measured Spark tuning, cloud identity validation and a genuine BI dashboard. Local Docker acceptance is now recorded in the validation ledger.

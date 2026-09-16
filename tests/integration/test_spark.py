@@ -17,6 +17,23 @@ class SparkTest(unittest.TestCase):
             self.assertEqual(parsed.filter("reject_reason = ''").count(), 1)
             self.assertEqual(parsed.filter("reject_reason <> ''").count(), 2)
             self.assertEqual(str(parsed.schema['amount'].dataType), 'DecimalType(22,2)')
+            # Exercise the actual streaming rule SQL on Spark, including thresholds
+            # and both five-minute windows (the small source demo has no alerts).
+            from streaming.rules import risk_sql
+            spark.sql("""SELECT transaction_id, account_id, cast(event_time as timestamp) event_time,
+                cast(amount as decimal(22,2)) amount, status, transaction_type FROM VALUES
+                ('T0','A','2026-01-01 00:00:00',100,'SUCCESS','TRANSFER_OUT'),
+                ('T1','A','2026-01-01 00:01:00',100,'SUCCESS','TRANSFER_OUT'),
+                ('T2','A','2026-01-01 00:02:00',100,'SUCCESS','TRANSFER_OUT'),
+                ('L','A','2026-01-01 00:10:00',10001,'SUCCESS','DEPOSIT'),
+                ('E','B','2026-01-01 00:10:00',10000,'SUCCESS','DEPOSIT'),
+                ('F0','C','2026-01-01 00:00:00',100,'FAILED','WITHDRAWAL'),
+                ('F1','C','2026-01-01 00:01:00',100,'FAILED','WITHDRAWAL'),
+                ('F2','C','2026-01-01 00:02:00',100,'FAILED','WITHDRAWAL')
+                AS events(transaction_id,account_id,event_time,amount,status,transaction_type)
+                """).createOrReplaceTempView('risk_events')
+            self.assertEqual({(r.transaction_id, r.rule) for r in spark.sql(risk_sql()).collect()},
+                {('T2', 'TRANSFER_VELOCITY'), ('L', 'AMOUNT'), ('F2', 'REPEATED_FAILURES')})
         finally:
             spark.stop()
 

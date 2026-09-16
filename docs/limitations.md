@@ -1,8 +1,9 @@
 # Known limitations and remaining acceptance gates
 
-1. Docker/Java were absent: PostgreSQL constraints/startup, MinIO/REST persistence,
-   Spark transformations, Trino materialization, Airflow and broker/checkpoint restart
-   are implemented but not executed in authoring. Run scripts/e2e.py and service tests.
+1. Local Docker validation now covers PostgreSQL/MinIO/REST, Spark Silver, Trino/dbt,
+   Airflow and broker/checkpoint restart (2026-09-16/17). This is a small single-host
+   demonstration, not production or scale acceptance. The SQLite-backed REST fixture
+   uses one JDBC client to avoid metadata write locks after restart.
 2. Local Iceberg uses a persistent SQL catalog test setup; deployment uses REST.
    Passing the local test does not validate the REST image, credentials or Docker networking.
 3. Azure Terraform init/fmt/validate pass; no account, plan, apply, ADLS I/O or identity
@@ -30,6 +31,7 @@
 12. No real Power BI artifact/screenshots, GitHub CI run, Datadog deployment or paid
     service was fabricated. No production banking or large-scale performance claim.
 
-Fresh-clone Terraform init also encountered a local provider-checksum file-access
-error (FAIL). The existing working-repository validate passed. This distinction
-is retained in validation/clean-clone.json and needs a normal-machine recheck.
+Fresh-clone Terraform init previously encountered a local provider-checksum
+file-access error. A subsequent Linux-container run of Terraform 1.11.4 passed
+fmt, init and validate with AzureRM 4.26.0. Historical validation/clean-clone.json
+retains its original result. No Azure resources were deployed.

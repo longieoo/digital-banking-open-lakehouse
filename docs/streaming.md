@@ -26,5 +26,8 @@ this educational implementation rescans retained history per microbatch and need
 retention/incremental window state before high-volume use. A failed microbatch may
 leave earlier table commits; retry repairs them before checkpoint advancement.
 
-Rule SQL tests execute locally; broker, checkpoint restart and real Structured
-Streaming validation remain UNAVAILABLE without Docker/Java. See demo commands.
+Local Docker validation on 2026-09-16/17 delivered 230 messages (225 unique events),
+restarted the consumer with its checkpoint, and replayed the producer without
+increasing unique events or Bronze versions. The small fixture produces no alerts
+at the default threshold; the Spark integration test verifies all three rules with
+controlled events, including the exact amount threshold boundary.
