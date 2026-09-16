@@ -25,3 +25,27 @@ alone does not establish runtime acceptance.
 Environment discovery: Python 3.12 and Git available; Docker daemon/Java absent.
 Terraform was subsequently downloaded and verified; init/fmt/validate PASS.
 No live infrastructure or Azure deployment is claimed. See validation/local-tests.json.
+
+## Local Windows rerun — 2026-09-16
+
+- PASS: Python 3.12.14 virtual environment installed from requirements-test.txt;
+  33 tests passed, 2 service tests skipped because their runtimes were unavailable.
+- PASS: local demo returned 113 source/Iceberg/Gold events, 8 Customer 360 rows,
+  248 daily balances and zero reconciliation failures. Existing local-demo state
+  was preserved; this was a rerun, not fresh-clone acceptance.
+- PASS: Ruff, Python compilation, tracked-file hygiene, dependency consistency,
+  all-profile Compose configuration validation and dbt 1.11.14 / Trino adapter
+  1.9.3 parsing without a live server.
+- UNAVAILABLE: distributed acceptance. Docker Desktop 4.85.0 failed during
+  startup while initializing its Inference manager: the local dockerInference
+  socket could not be accessed (Windows error 1920). Restarting reproduced the
+  error; a non-destructive socket rename was also refused. The documented Compose
+  startup command timed out waiting for the unavailable engine. No stack runtime
+  success, Spark execution or live dbt build is claimed.
+- Changes: created ignored .venv and .env using the documented helper, installed
+  test/dbt dependencies, and refreshed ignored runtime/demo and dbt parse outputs.
+  No application code, dependency pins or Compose settings required modification.
+  Git ownership checks used a command-scoped safe.directory override; global Git
+  settings were not changed. No Docker factory reset or volume removal was done.
+- Next gate: restore a working Docker Desktop Linux engine, then rerun the
+  distributed batch commands in docs/demo.md and scripts/e2e.py.
