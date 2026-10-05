@@ -105,7 +105,8 @@ Run `docker compose exec airflow-scheduler python -m pip check` to verify the
 Airflow environment after rebuilding its image.
 
 `docker compose run --rm --entrypoint python bank -m bank.external` loads the labeled
-offline FX fixture. Add --live only when endpoint access is available. BI serving
+offline FX fixture. Add --live for the latest real USD/EUR reference rate; use
+`python -m bank.external --live --fetch-only` to check the API without Docker. BI serving
 instructions and DAX are in bi/README.md. No PBIX or dashboard screenshots are claimed.
 
 ## Stop / reset

@@ -1,9 +1,20 @@
 # Public exchange-rate interface
 
-[Frankfurter v1](https://frankfurter.dev/v1/) exposes public historical JSON reference
-rates. Live request attempted 2026-09-08:
-`https://api.frankfurter.dev/v1/2026-01-30?base=USD&symbols=EUR` returned HTTP 403.
-Live extraction is **UNAVAILABLE** in this environment; no live rates are claimed.
+[Frankfurter v2](https://frankfurter.dev/) exposes public daily reference rates
+without an API key. Live extraction uses
+`https://api.frankfurter.dev/v2/rate/USD/EUR` with explicit JSON/User-Agent headers.
+The previous fixed-date v1 request returned HTTP 403 in this environment.
+The v2 request succeeded on 2026-10-05; it returns the latest available business
+date, which may precede today on weekends or holidays. This is a daily reference
+rate, not an intraday executable bank quote. The default v2 feed blends providers.
+
+Fetch and validate without Docker: `python -m bank.external --live --fetch-only`.
+Fetch and ingest into raw/Bronze: `python -m bank.external --live` with the normal
+lakehouse environment and services running. Repeating this command fetches the
+latest available rate; this change does not install a recurring scheduler.
+The ingestion source version is the business date: same-day provider corrections
+are not currently tracked as new versions. Use a provider-specific feed and a
+revision-aware ingestion contract before relying on intraday corrections.
 
 `frankfurter-fixture.json` is an invented deterministic interface fixture, not an
 actual market quote. `python -m bank.external` ingests it into a clearly named

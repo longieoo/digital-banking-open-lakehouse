@@ -4,21 +4,27 @@ from decimal import Decimal
 import json
 import os
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from bank.ingestion import MemorySource, State, ingest
 
-URL = 'https://api.frankfurter.dev/v1/2026-01-30?base=USD&symbols=EUR'
+URL = 'https://api.frankfurter.dev/v2/rate/USD/EUR'
 
 
 def rates(live=False):
     if live:
-        with urlopen(URL,timeout=20) as response:
+        request = Request(URL,headers={'User-Agent':'bank-lakehouse/0.1','Accept':'application/json'})
+        with urlopen(request,timeout=20) as response:
             content = response.read()
         origin = 'LIVE'
     else:
         content = Path('sources/external/frankfurter-fixture.json').read_bytes()
         origin = 'OFFLINE_FIXTURE'
     document = json.loads(content,parse_float=Decimal)
+    if live:
+        if document['base'] != 'USD' or document['quote'] != 'EUR':
+            raise ValueError('Unexpected FX currency pair')
+        document = dict(date=document['date'],base=document['base'],amount=1,
+            rates={document['quote']:document['rate']})
     day = date.fromisoformat(document['date']).isoformat()
     if document['base'] != 'USD' or Decimal(str(document['amount'])) != 1:
         raise ValueError('Unexpected FX base or amount')
@@ -34,11 +40,15 @@ def rates(live=False):
 
 if __name__ == '__main__':
     import argparse
-    from bank.adapters import IcebergBronze,iceberg_catalog,raw_store
     parser = argparse.ArgumentParser()
     parser.add_argument('--live',action='store_true')
+    parser.add_argument('--fetch-only',action='store_true',help='Print validated rows without lakehouse ingestion')
     args = parser.parse_args()
     rows = rates(args.live)
+    if args.fetch_only:
+        print(json.dumps(rows))
+        raise SystemExit(0)
+    from bank.adapters import IcebergBronze,iceberg_catalog,raw_store
     # Keep fixture and live versions in different tables: provenance is part of meaning.
     table = 'fx_rates_live' if args.live else 'fx_rates_fixture'
     result = ingest(MemorySource(rows,'rate_id'),raw_store(),IcebergBronze(iceberg_catalog(),table),

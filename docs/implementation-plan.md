@@ -88,3 +88,18 @@ volume permissions and a single JDBC client, Spark's writable persistent Ivy cac
 deferred shared annotations for the pinned Spark image, isolated Airflow/dbt
 dependencies and matching aiobotocore, and health/write-after-restart E2E gates.
 No financial transformations or dependency versions of standalone dbt were changed.
+
+## Live FX follow-up, 2026-10-05
+
+ADR 008 replaces the failing fixed-date v1 route with Frankfurter v2 latest USD/EUR
+and adds --fetch-only. PASS: real HTTP extraction on Windows and in Docker, raw/
+Iceberg Bronze ingestion of one LIVE row, direct persisted-table read, and replay
+with zero new rows. PASS: 36 local checks and Ruff; two opt-in infrastructure tests
+were skipped in this run. The prior full-stack validation remains historical.
+
+Docker was initially paused. After it became available, catalog startup encountered
+a host port 8181 collision. Validation used ignored runtime/fx-compose-override.yml
+with catalog ports reset to an empty list, preserving internal Docker connectivity.
+No unrelated process was stopped. Repeat these FX integration commands with
+`docker compose -f docker-compose.yml -f runtime/fx-compose-override.yml` while the
+host port remains occupied. Azure, Power BI and scheduled live FX remain outstanding.
