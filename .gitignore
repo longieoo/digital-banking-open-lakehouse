@@ -10,6 +10,7 @@ work/
 dbt/target/
 dbt/logs/
 dbt/dbt_packages/
+dbt/.user.yml
 .terraform/
 *.tfstate*
 *.tfvars

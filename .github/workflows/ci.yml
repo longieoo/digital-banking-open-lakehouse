@@ -1,5 +1,13 @@
 name: quality
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      distributed:
+        description: 'Run real release acceptance on the dedicated 16GB+ Docker runner'
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -30,3 +38,33 @@ jobs:
       - run: terraform -chdir=infra/terraform fmt -check
       - run: terraform -chdir=infra/terraform init -backend=false -input=false
       - run: terraform -chdir=infra/terraform validate
+  distributed-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.distributed
+    runs-on: [self-hosted, linux, bank-lakehouse]
+    timeout-minutes: 90
+    env:
+      COMPOSE_PROJECT_NAME: bank-release-ci-${{ github.run_id }}
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -e .
+      - run: python scripts/create_demo_env.py
+      # The demo runtime is owned by container UID 50000; this dedicated Docker
+      # runner needs host permission to write evidence beside container artifacts.
+      - run: sudo --preserve-env=COMPOSE_PROJECT_NAME,COMPOSE_FILE "$(command -v python)" -m scripts.release_acceptance
+      - name: Collect readable evidence without raw data or credentials
+        if: always()
+        run: |
+          if [ -d runtime ]; then
+            sudo find runtime -type f \( -name release-acceptance.json -o -path 'runtime/releases/*/release.json' -o -path 'runtime/releases/*/timings.json' \) -exec install -D -m 0644 {} ci-evidence/{} \;
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-evidence
+          path: ci-evidence/
+      - run: docker compose --profile core --profile lakehouse --profile query stop
+        if: always()

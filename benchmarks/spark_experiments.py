@@ -4,13 +4,17 @@ import json
 import os
 from pathlib import Path
 import platform
+from statistics import median
 from time import perf_counter
 from processing.silver import session
 
 
-def experiments(spark, volumes, jdbc=False):
+def experiments(spark, volumes, jdbc=False, repeats=3):
     from pyspark.sql import functions as F
     output = []
+    if repeats < 1 or any(n < 1 for n in volumes):
+        raise ValueError('Positive row counts and repeats required')
+    expected = {}
     for n in volumes:
         for partitions in [1, 4, 8]:
             for strategy in ['broadcast','merge']:
@@ -19,10 +23,21 @@ def experiments(spark, volumes, jdbc=False):
                 dim = spark.range(100).select(F.col('id').alias('branch_id')).hint(strategy)
                 query = facts.join(dim, 'branch_id').groupBy('branch_id').sum('amount')
                 query.explain(mode='formatted')
-                start = perf_counter()
-                result = query.collect()
+                # Warm up the JVM/plan; data is not explicitly cached.
+                query.collect()
+                samples = []
+                for _ in range(repeats):
+                    start = perf_counter()
+                    result = query.collect()
+                    samples.append(perf_counter()-start)
+                totals = {row['branch_id']:str(row['sum(amount)']) for row in result}
+                if n in expected and totals != expected[n]:
+                    raise ValueError('Join strategies produced different monetary totals')
+                expected[n] = totals
                 output.append(dict(rows=n,partitions=partitions,join=strategy,
-                                   seconds=perf_counter()-start,result_groups=len(result)))
+                                   seconds=median(samples),samples_seconds=samples,
+                                   result_groups=len(result),correctness='PASS',
+                                   executed_plan=query._jdf.queryExecution().executedPlan().toString()))
     if jdbc:
         for partitions in [1,4]:
             reader = spark.read.format('jdbc').option('url','jdbc:postgresql://postgres:5432/bank')
@@ -40,11 +55,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--rows',nargs='+',type=int,default=[100000,1000000])
     parser.add_argument('--jdbc',action='store_true')
+    parser.add_argument('--repeats',type=int,default=3)
     args = parser.parse_args()
     spark = session()
-    measurements = experiments(spark,args.rows,args.jdbc)
+    measurements = experiments(spark,args.rows,args.jdbc,args.repeats)
     path = Path('runtime/spark-benchmark.json')
     path.parent.mkdir(parents=True,exist_ok=True)
     path.write_text(json.dumps(dict(environment=platform.platform(),spark=spark.version,
+                                   visible_cpu_count=os.cpu_count(),parallelism=spark.sparkContext.defaultParallelism,
+                                   cache_scope='one unrecorded warm-up; no explicit data cache',
+                                   scope='synthetic join microbenchmark, not end-to-end banking throughput',
                                    measurements=measurements),indent=2))
     spark.stop()

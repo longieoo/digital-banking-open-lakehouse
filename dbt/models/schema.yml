@@ -2,7 +2,7 @@ version: 2
 sources:
 - name: silver
   database: lake
-  schema: silver
+  schema: "{{ var('silver_schema', 'silver') }}"
   tables:
   - name: branches
   - name: customers
@@ -18,10 +18,15 @@ sources:
   - name: source_totals
 - name: bronze
   database: lake
-  schema: bronze
+  schema: "{{ var('bronze_schema', 'bronze') }}"
   tables:
   - name: transactions
 models:
+- name: dim_currency
+  description: 'Grain: one account currency; do not sum amounts across currencies.'
+  columns:
+  - name: currency
+    tests: [unique, not_null]
 - name: dim_customer
   description: 'Grain: one contiguous business-attribute interval per customer, [valid_from,
     valid_to).'

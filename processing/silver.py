@@ -75,11 +75,23 @@ def merge(frame, target, keys, versioned=True):
               f'WHEN MATCHED{condition} THEN UPDATE SET * WHEN NOT MATCHED THEN INSERT *')
 
 
-def process_table(spark, table):
+def process_table(spark, table, bronze_schema='bronze', silver_schema='silver',
+                  quarantine_schema='quarantine', strict=False):
     from pyspark.sql import functions as F, Window
-    frame = parse_frame(spark.table(f'lake.bronze.{table}'), table)
+    bronze = spark.table(f'lake.{bronze_schema}.{table}')
+    if table=='source_totals':
+        # A control epoch is a complete snapshot of groups, including disappeared groups.
+        epoch = bronze.select(F.max('source_updated_at').alias('epoch')).first().epoch
+        bronze = bronze.filter(F.col('source_updated_at')==epoch)
+    if strict:
+        # An invalid current version must block publication instead of using an old valid row.
+        history_keys = ['record_id','source_updated_at'] if table=='customer_history' else ['record_id']
+        bronze = bronze.withColumn('_version',F.row_number().over(
+            Window.partitionBy(*history_keys).orderBy(F.col('source_updated_at').desc())))
+        bronze = bronze.filter('_version = 1').drop('_version')
+    frame = parse_frame(bronze, table)
     for col, parent, parent_key in REFERENCES.get(table, []):
-        parent_frame = spark.table(f'lake.silver.{parent}')
+        parent_frame = spark.table(f'lake.{silver_schema}.{parent}')
         currency_check = 'currency' in frame.columns and 'currency' in parent_frame.columns
         ref_columns = [F.col(parent_key).alias('_ref')]
         if currency_check:
@@ -113,23 +125,75 @@ def process_table(spark, table):
         frame = frame.drop(*[c for c in frame.columns if c.startswith('_original_')])
     rejected = frame.filter("reject_reason <> ''").select('payload','batch_id','reject_reason').withColumn(
         'reject_id', F.sha2(F.concat_ws('|','payload','reject_reason'),256)).dropDuplicates(['reject_id'])
-    merge(rejected, f'lake.quarantine.{table}', ['reject_id'], versioned=False)
+    merge(rejected, f'lake.{quarantine_schema}.{table}', ['reject_id'], versioned=False)
+    rejected_count = rejected.count()
+    if strict and rejected_count:
+        raise ValueError(f'Silver quality gate rejected {rejected_count} rows in {table}')
     good = frame.filter("reject_reason = ''").drop('payload','reject_reason','batch_id')
     keys = primary_key(table)
     good = good.withColumn('_rn', F.row_number().over(
         Window.partitionBy(*keys).orderBy(F.col('updated_at').desc())))
     good = good.filter('_rn = 1').drop('_rn')
-    merge(good, f'lake.silver.{table}', keys)
-    print(f'{{"table":"{table}","rejected":{rejected.count()},"accepted":{good.count()}}}')
+    if table=='source_totals':
+        good.writeTo(f'lake.{silver_schema}.{table}').using('iceberg').tableProperty('format-version','2').createOrReplace()
+    else:
+        merge(good, f'lake.{silver_schema}.{table}', keys)
+    accepted_count = good.count()
+    print(f'{{"table":"{table}","rejected":{rejected_count},"accepted":{accepted_count}}}')
+    return dict(table=table,rejected=rejected_count,accepted=accepted_count)
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--release-id')
+    args = parser.parse_args()
     spark = session()
+    if args.release_id:
+        release(spark,args.release_id)
+        spark.stop()
+        return
     for namespace in ['silver','quarantine']:
         spark.sql(f'CREATE NAMESPACE IF NOT EXISTS lake.{namespace}')
     for table in TABLES:
         process_table(spark, table)
     spark.stop()
+
+
+def release(spark, value):
+    from bank.release import load, directory, atomic_json
+    from bank.pipeline import DATED_TABLES, RELATED_TABLES
+    from bank.ingestion import utc
+    from pyspark.sql import functions as F
+    document = load(value)
+    if document['status']=='CERTIFIED':
+        return
+    bronze, silver = document['bronze_schema'], document['silver_schema']
+    quarantine = f'quarantine_r_{document["release_id"]}'
+    for namespace in (bronze,silver,quarantine):
+        spark.sql(f'CREATE NAMESPACE IF NOT EXISTS lake.{namespace}')
+    frames = {}
+    for table,snapshot in document['bronze_snapshots'].items():
+        reader = spark.read.format('iceberg')
+        frame = reader.option('snapshot-id',str(snapshot)).load(f'lake.bronze.{table}') if snapshot else (
+            reader.load(f'lake.bronze.{table}').limit(0))
+        if table in DATED_TABLES:
+            frame = frame.filter(f"business_date BETWEEN '{document['start_date']}' AND '{document['as_of_date']}'")
+        if table=='source_totals':
+            frame = frame.filter(F.col('source_updated_at')==utc(document['source_cutoff']['captured_at']))
+        frames[table] = frame
+    for table,frame in frames.items():
+        if table in RELATED_TABLES:
+            child_key,parent,parent_key = RELATED_TABLES[table]
+            parent_column = F.col('record_id') if parent_key=='record_id' else F.get_json_object('payload',f'$.{parent_key}')
+            included = frames[parent].select(parent_column.alias('_included')).distinct()
+            frame = frame.join(included,F.get_json_object(frame.payload,f'$.{child_key}')==included._included,'left_semi')
+        # Isolate both SQL engines from ongoing batch and streaming writes.
+        frame.writeTo(f'lake.{bronze}.{table}').using('iceberg').createOrReplace()
+    measurements = [process_table(spark,table,bronze,silver,quarantine,strict=True) for table in TABLES]
+    document.update(status='SILVER_READY',silver_quality={'rejected':sum(r['rejected'] for r in measurements),
+                                                       'tables':measurements})
+    atomic_json(directory(value)/'release.json',document)
 
 
 if __name__ == '__main__':

@@ -9,6 +9,17 @@ of query results is a fallback for a static portfolio demo.
 
 ## Semantic model
 
+The certified local serving option is the CSV bundle selected once by
+runtime/releases/current.json; see [release runbook](../docs/releases.md). Load all
+tables from the same release and display its business date. Avoid directly reading
+an in-progress candidate schema. Hash verification supports an exported-data restore.
+
+Add dim_currency 1:* to currency on each monetary fact, using single-direction
+filters. DAX monetary measures now return BLANK without exactly one currency.
+Transaction Value means requested value across statuses; Posted Transaction Value
+includes SUCCESS only; Net Posted Movement is signed. These DAX changes are source
+specification changes, not a claim of validated Power BI Desktop execution.
+
 Use dim_date 1:* business_date to each fact; dim_account 1:* account_id to transaction
 and balance facts; dim_card 1:* card_id to card facts; dim_branch 1:* branch_id on
 dim_account; dim_customer 1:* customer_sk on fct_transactions for historical segment.

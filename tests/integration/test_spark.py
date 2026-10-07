@@ -4,6 +4,35 @@ import unittest
 
 @unittest.skipUnless(os.environ.get('RUN_SPARK') == '1', 'Set RUN_SPARK=1 with Spark/Iceberg runtime')
 class SparkTest(unittest.TestCase):
+    def test_control_epochs_remove_disappeared_groups(self):
+        import json
+        import uuid
+        from processing.silver import session, process_table
+        spark = session()
+        prefix = 'quality_' + uuid.uuid4().hex
+        namespaces = [prefix + suffix for suffix in ('_b','_s','_q')]
+        try:
+            for namespace in namespaces:
+                spark.sql(f'CREATE NAMESPACE lake.{namespace}')
+            def frame(currency,stamp):
+                payload = dict(total_id=f'2026-01-01-{currency}',business_date='2026-01-01',
+                               currency=currency,source_count=1,source_amount='1.00',updated_at=stamp)
+                return spark.createDataFrame([(json.dumps(payload),'test',payload['total_id'],stamp,'2026-01-01')],
+                    ['payload','batch_id','record_id','source_updated_at','business_date'])
+            frame('EUR','2026-01-30T00:00:00+00:00').union(
+                frame('USD','2026-01-31T00:00:00+00:00')).writeTo(f'lake.{namespaces[0]}.source_totals').create()
+            process_table(spark,'source_totals',*namespaces,strict=True)
+            self.assertEqual([row.currency for row in spark.table(f'lake.{namespaces[1]}.source_totals').collect()],['USD'])
+            frame('EUR','2026-02-01T00:00:00+00:00').writeTo(f'lake.{namespaces[0]}.source_totals').append()
+            process_table(spark,'source_totals',*namespaces,strict=True)
+            self.assertEqual([row.currency for row in spark.table(f'lake.{namespaces[1]}.source_totals').collect()],['EUR'])
+        finally:
+            for namespace in namespaces:
+                for table in spark.sql(f'SHOW TABLES IN lake.{namespace}').collect():
+                    spark.sql(f'DROP TABLE lake.{namespace}.{table.tableName}')
+                spark.sql(f'DROP NAMESPACE IF EXISTS lake.{namespace}')
+            spark.stop()
+
     def test_typing_and_quarantine(self):
         from processing.silver import session, parse_frame
         from bank.generator import generate

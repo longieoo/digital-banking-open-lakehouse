@@ -25,7 +25,9 @@
 9. Streaming recomputes retained history per batch; it accepts/audits late events
    instead of maintaining bounded event-time state. Alert observations are retained
    after corrections. Standalone streaming requires an explicit downstream dbt refresh.
-10. FX live request returned HTTP 403. The rate file is explicitly invented test data.
+10. Frankfurter v2 live ingestion passed on 2026-10-05; its fixture remains invented.
+    Connections to Azure/FX are assumed complete for the upgrade scope; this does
+    not convert historical NOT RUN records into newly observed cloud validation.
 11. Trino HTTP usernames are unauthenticated locally; role rules and masking are a
     demonstration, not a shared-network security perimeter. Catalog fixture is local-only.
 12. No real Power BI artifact/screenshots, GitHub CI run, Datadog deployment or paid
@@ -35,3 +37,11 @@ Fresh-clone Terraform init previously encountered a local provider-checksum
 file-access error. A subsequent Linux-container run of Terraform 1.11.4 passed
 fmt, init and validate with AzureRM 4.26.0. Historical validation/clean-clone.json
 retains its original result. No Azure resources were deployed.
+
+The new release path (ADR 009) closes business-date, common-read-snapshot, paged
+dependent-backfill and last-good-publication gaps for the documented source contract.
+It still fully builds isolated Silver/Gold, uses a single-host lock, and serves
+certified local CSVs. It does not implement multi-table SQL publication, general
+CDC/delete processing, distributed HA or a Power BI Desktop artifact. Source control
+totals are now derived from the same read transaction as source data; legacy
+uncoordinated manual writer paths must not be used as certification evidence.

@@ -103,3 +103,53 @@ with catalog ports reset to an empty list, preserving internal Docker connectivi
 No unrelated process was stopped. Repeat these FX integration commands with
 `docker compose -f docker-compose.yml -f runtime/fx-compose-override.yml` while the
 host port remains occupied. Azure, Power BI and scheduled live FX remain outstanding.
+
+## Data Engineering upgrade — 2026-10-07
+
+The upgrade keeps the frozen architecture and prioritizes reproducible reporting,
+source consistency, recovery, quality and measured execution. ADR 009 and
+docs/releases.md define the new primary path. Azure/FX connectivity is treated as
+already complete for this scope; this run does not re-certify Azure deployment.
+
+- PASS: 49 tests discovered; 45 execute locally and four opt-in tests skip there.
+  Those four then pass against real infrastructure: two PostgreSQL/MinIO/REST
+  tests (recovery and a shared read snapshot under a concurrent commit), and two
+  Spark tests (typing/quarantine/risk rules and disappearing control groups).
+- PASS: full legacy scripts/e2e.py pipeline and write after catalog/MinIO restart.
+  Each Gold build now runs 15 models and 33 tests, 48/48 successful steps.
+- PASS: scripts.release_acceptance using actual PostgreSQL → raw/Bronze → Spark
+  Silver → Trino/dbt Gold. January 31 has 225 transactions, 20 Customer 360 rows,
+  620 balances and 30 passing reconciliation groups. January 30 has 600 balances.
+  Existing-ID replay verifies exports without rebuilding; historical certification
+  does not replace the current January 31 pointer. An injected failed dbt artifact
+  blocks certification and preserves the pointer. This is not a network-outage test.
+- PASS: a separate real invalid-currency source test blocks strict Silver and
+  preserves the last certified pointer. The synthetic source was restored afterward.
+- PASS: Airflow dags test bank_release executes all three tasks successfully;
+  its January 31 UTC interval correctly derives January 30 as the reporting day.
+  This proves DAG execution, not a long-running daily scheduling history.
+- PASS: copied certified BI bundle verifies all 15 export SHA-256 hashes and
+  30/30 reconciliation results. This is a file-bundle restore check, not recovery
+  of PostgreSQL, object storage, catalog/control databases or stream checkpoints.
+- PASS: measured Spark local[2] joins at 100K and 1M rows, 12 configurations,
+  one warm-up and three repetitions per case. All exact-money totals agree.
+  This microbenchmark is not end-to-end banking or multi-node throughput.
+- PASS: Ruff, compilation, dbt parse, Compose/workflow configuration and numeric
+  monitoring output. GitHub CI execution, JDBC benchmarking and a native Power BI
+  Desktop/DAX execution remain UNAVAILABLE in this validation scope.
+
+Resolved during integration: date filtering on related facts without business_date;
+export identifiers containing digits (Customer 360); stale control groups after
+source correction; and explicit Spark test-table cleanup because Iceberg REST
+does not cascade-drop a nonempty namespace. The concurrent-view test now finds its
+record by ID because source version triggers legitimately change sort order.
+Airflow's primary Compose volume set now also mounts the shared Ivy cache; its
+image creates that path with the Airflow UID so standalone runs have write access.
+
+Evidence: docs/validation/de-upgrade-2026-10-07.json. Detailed secured local logs,
+release manifests, CSVs and benchmark plans remain under ignored runtime/.
+Docker resources use a dedicated bank-de-upgrade Compose project; validation used
+the existing host runtime directory, so filesystem control state was not isolated
+from earlier local runs. Forward watermarks stay unchanged during release replay.
+Full incremental Silver/Gold, general CDC/deletes, distributed locking, retention/
+compaction and shared-service authentication remain explicitly bounded follow-ups.

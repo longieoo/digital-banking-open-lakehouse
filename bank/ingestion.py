@@ -55,6 +55,10 @@ class State:
               raw_written_count INTEGER DEFAULT 0, bronze_written_count INTEGER DEFAULT 0,
               target_snapshot TEXT, error TEXT, attempts INTEGER DEFAULT 1);
             ''')
+            columns = {row[1] for row in db.execute('PRAGMA table_info(batches)')}
+            for column in ('raw_key','raw_sha256','source_snapshot'):
+                if column not in columns:
+                    db.execute(f'ALTER TABLE batches ADD COLUMN {column} TEXT')
 
     @contextmanager
     def connect(self):
@@ -69,13 +73,22 @@ class State:
 
     @contextmanager
     def exclusive(self):
+        from threading import get_ident
+        if getattr(self, '_lock_owner', None) == get_ident():
+            yield
+            return
         # A separate SQLite transaction serializes writers without making STARTED
         # manifests uncommitted. OS releases locks after a process crash.
         db = sqlite3.connect(str(self.path) + ".lock", timeout=60)
+        acquired = False
         try:
             db.execute("BEGIN IMMEDIATE")
+            acquired = True
+            self._lock_owner = get_ident()
             yield
         finally:
+            if acquired:
+                self._lock_owner = None
             db.rollback()
             db.close()
 
@@ -160,25 +173,28 @@ class MemorySource:
 
 def ingest(source: Source, raw: RawStore, bronze: BronzeStore, state: State,
            source_name="core.transactions", key="transaction_id", limit=10000,
-           dates: tuple[str, str] | None = None, fail_at=None):
+           dates: tuple[str, str] | None = None, fail_at=None, cursor=None, request_token=None):
     if limit < 1:
         raise ValueError("Positive batch limit required")
     if dates and (date.fromisoformat(dates[0]) > date.fromisoformat(dates[1])):
         raise ValueError("Invalid backfill range")
     with state.exclusive():
-        start = state.watermark(source_name)
+        if cursor is not None and not dates:
+            raise ValueError('Explicit cursor is only supported for backfill')
+        start = cursor if cursor is not None else state.watermark(source_name)
         mode = "BACKFILL" if dates else "INCREMENTAL"
         # A request identity exists even if extraction itself fails.
-        request = dict(source=source_name, start=start.__dict__, dates=dates, limit=limit)
+        request = dict(source=source_name, start=start.__dict__, dates=dates, limit=limit,
+                       source_snapshot=request_token)
         batch_id = hashlib.sha256(canonical(request)).hexdigest()
         now = datetime.now(timezone.utc).isoformat()
         system, table = source_name.split(".")
         with state.connect() as db:
             db.execute('''INSERT INTO batches(batch_id,source_system,source_table,mode,started_at,
-                status,start_watermark) VALUES(?,?,?,?,?,'STARTED',?)
+                status,start_watermark,source_snapshot) VALUES(?,?,?,?,?,'STARTED',?,?)
                 ON CONFLICT(batch_id) DO UPDATE SET status='STARTED',error=NULL,
                 completed_at=NULL, attempts=attempts+1''',
-                (batch_id, system, table, mode, now, canonical(start.__dict__).decode()))
+                (batch_id, system, table, mode, now, canonical(start.__dict__).decode(),request_token))
         try:
             extracted = source.extract(start, limit, dates)
             rows_by_version = {}
@@ -193,6 +209,9 @@ def ingest(source: Source, raw: RawStore, bronze: BronzeStore, state: State,
             content = canonical(normalized)
             digest = hashlib.sha256(content).hexdigest()
             raw_key = f"{system}/{table}/{digest}.json"
+            with state.connect() as db:
+                db.execute('UPDATE batches SET raw_key=?,raw_sha256=? WHERE batch_id=?',
+                           (raw_key,digest,batch_id))
             with state.connect() as db:
                 db.execute("UPDATE batches SET extracted_count=?,end_watermark=? WHERE batch_id=?",
                            (len(extracted), canonical(end.__dict__).decode(), batch_id))
@@ -222,7 +241,8 @@ def ingest(source: Source, raw: RawStore, bronze: BronzeStore, state: State,
                 if not dates:
                     db.execute("INSERT INTO watermark VALUES(?,?,?) ON CONFLICT(source) DO UPDATE "
                                "SET ts=excluded.ts,id=excluded.id", (source_name, end.updated_at, end.record_id))
-            return dict(batch_id=batch_id, count=written, snapshot=snapshot, status="COMPLETED")
+            return dict(batch_id=batch_id, count=written, snapshot=snapshot, status="COMPLETED",
+                        end_watermark=end.__dict__)
         except Exception as exc:
             with state.connect() as db:
                 # Exception messages can contain connection strings; store type only.

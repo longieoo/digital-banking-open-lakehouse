@@ -7,15 +7,19 @@ tables/strategies are rejected rather than generating arbitrary SQL. This runner
 was introduced after explicit transaction/card/GL adapters and SQL tests.
 
 Run `python -m bank.pipeline` inside the bank container (override entrypoint to
-python). It refreshes independent PostgreSQL control totals, ingests sources in FK
-order and pages to exhaustion. Source writers should be paused for a consistent
-cross-table audit. Table deletions/tombstones and multi-host ingestion are unsupported.
+python). It reads all pages and tables from one PostgreSQL REPEATABLE READ snapshot,
+derives independent source control totals from that same view, and ingests in FK
+order. Table deletions/tombstones and multi-host ingestion are unsupported.
 
-Airflow's three thin DAGs form Bronze Dataset → Silver Dataset → Gold build/tests.
-Each publishes only on task success. Retries use the same control state and
-idempotent target writes. Manual `bank_bronze` parameters start_date/end_date invoke
-transaction-only historical backfill. Run the normal pipeline to refresh all
-controls and dimensions before a full reconciliation after backfill.
+The primary daily UTC DAG is `bank_release`: one pinned source capture, isolated
+Spark Silver, then dbt build/tests and certification. It derives the business date
+from the data interval, supports explicit manual dates/currency, and allows one
+active run. Related facts, dimensions and controls accompany historical replay;
+forward ingestion watermarks do not move. See [release runbook](releases.md).
+
+The three older Dataset DAGs remain a manual compatibility demo. bank_bronze has
+no automatic schedule. Their mutable Gold tables are separate from the certified
+CSV publication boundary. Existing task retries retain idempotent ingestion.
 
 The resource-aware local Airflow demo uses SequentialExecutor and persistent SQLite
 metadata. It is intentionally single-host; use a separate metadata PostgreSQL for
@@ -23,5 +27,6 @@ multi-worker deployment. No Docker socket is exposed to Airflow. Its image inclu
 Spark and dbt clients; it starts jobs rather than hosting business transformations.
 Airflow image build, DAG import and Dataset-triggered Bronze → Silver → Gold were
 validated locally on 2026-09-16/17. dbt runs in `/opt/bank/dbt-venv` to isolate its
-dependencies from Airflow. Unpause all three DAGs; downstream Dataset DAGs are
-initially paused too. Run `airflow dags list-import-errors` before enabling schedules.
+dependencies from Airflow. Enable bank_release for the new workflow; its daily
+schedule does not imply synthetic January data has become current. Run
+`airflow dags list-import-errors` before enabling schedules.

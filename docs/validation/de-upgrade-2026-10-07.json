@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-07",
+  "scope": "local synthetic Data Engineering upgrade; Azure/FX assumed complete, not revalidated",
+  "unit": {
+    "status": "PASS",
+    "discovered": 49,
+    "executed": 45,
+    "opt_in_skipped": 4
+  },
+  "postgres_minio_rest": {
+    "status": "PASS",
+    "tests": 2
+  },
+  "spark_integration": {
+    "status": "PASS",
+    "tests": 2
+  },
+  "distributed_e2e_restart": {
+    "status": "PASS",
+    "models": 15,
+    "data_tests": 33,
+    "steps_per_build": 48
+  },
+  "certified_release_acceptance": {
+    "current_release": "a6300f4dbb4640bfa5dc37c58b290e4d",
+    "failure_scope": "injected dbt artifact failure; not a network outage",
+    "historical_does_not_publish_backwards": "PASS",
+    "historical_release": "d41782eb9ae04399b1772d13156f4d48",
+    "injected_incomplete_build_does_not_publish": "PASS",
+    "retry": "PASS",
+    "status": "PASS"
+  },
+  "current_release": {
+    "as_of_date": "2026-01-31",
+    "manifest": "a6300f4dbb4640bfa5dc37c58b290e4d/release.json",
+    "release_id": "a6300f4dbb4640bfa5dc37c58b290e4d"
+  },
+  "current_counts": {
+    "fct_transactions": 225,
+    "mart_customer_360": 20,
+    "fct_account_balance_daily": 620,
+    "mart_reconciliation_daily": 30
+  },
+  "quality": {
+    "rejected_rows": 0,
+    "reconciliation_failures": 0,
+    "real_invalid_currency_preserves_pointer": "PASS"
+  },
+  "airflow": {
+    "status": "PASS",
+    "method": "airflow dags test bank_release",
+    "logical_date": "2026-01-31T02:00:00+00:00",
+    "derived_business_date": "2026-01-30"
+  },
+  "copied_export_restore": {
+    "status": "PASS",
+    "files": 15,
+    "scope": "file bundle hashes only, not infrastructure disaster recovery"
+  },
+  "spark_join_benchmark": {
+    "status": "PASS",
+    "cases": 12,
+    "input_sizes": [
+      100000,
+      1000000
+    ],
+    "repeats": 3,
+    "parallelism": 2,
+    "scope": "synthetic join microbenchmark, not end-to-end banking throughput"
+  },
+  "static_checks": {
+    "ruff": "PASS",
+    "compileall": "PASS",
+    "dbt_parse": "PASS",
+    "compose": "PASS",
+    "workflow_yaml": "PASS",
+    "numeric_metrics": "PASS",
+    "tracked_hygiene": "PASS"
+  },
+  "unavailable_in_this_run": [
+    "GitHub workflow execution",
+    "native Power BI/DAX execution",
+    "JDBC benchmark",
+    "multi-node throughput",
+    "Azure deployment validation"
+  ],
+  "limitations": [
+    "full conformance/build; no full incremental Silver/Gold",
+    "no general CDC or hard deletes",
+    "single-host SQLite coordination",
+    "retention/compaction and authenticated shared deployment need separate implementation"
+  ],
+  "evidence_logs": [
+    "upgrade-unit-final-49.log",
+    "upgrade-stack-tests-retry.log",
+    "upgrade-spark-tests-final.log",
+    "upgrade-e2e.log",
+    "upgrade-acceptance-final.log",
+    "upgrade-airflow-dag.log"
+  ],
+  "docker_images": {
+    "status": "PASS",
+    "images": [
+      "bank",
+      "spark",
+      "dbt",
+      "airflow-scheduler"
+    ]
+  },
+  "packaged_certified_replay": {
+    "status": "PASS",
+    "configuration": "docker-compose.yml + docker-compose.ci.yml; no source bind mounts"
+  },
+  "services_health": {
+    "status": "PASS",
+    "services": [
+      "postgres",
+      "minio",
+      "catalog",
+      "trino",
+      "redpanda",
+      "airflow-scheduler",
+      "airflow-webserver"
+    ]
+  },
+  "airflow_packaged_replay": {
+    "status": "PASS",
+    "source_bind_mounts": false,
+    "full_pipeline_execution_log": "upgrade-airflow-dag.log",
+    "packaged_replay_log": "upgrade-airflow-packaged.log"
+  }
+}

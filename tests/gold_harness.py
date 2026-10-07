@@ -10,13 +10,15 @@ from bank.generator import generate
 
 
 class GoldHarness:
-    def __init__(self, data=None):
+    def __init__(self, data=None, variables=None):
         import duckdb
         self.db = duckdb.connect()
         self.db.execute('CREATE SCHEMA silver')
         self.db.execute('CREATE SCHEMA gold')
         self.db.execute('CREATE SCHEMA bronze')
         self.data = generate(customers=8, transactions=100) if data is None else data
+        self.variables = {'as_of_date':'2026-01-31','start_date':'2026-01-01','reporting_currency':'USD',
+                          **(variables or {})}
         for table, rows in self.data.items():
             cols = fields(table)
             definitions = ','.join(f'"{c}" {column_type(c).replace("string","varchar")}' for c in cols)
@@ -33,8 +35,7 @@ class GoldHarness:
         import sqlglot
         sql = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(Path(path).read_text()).render(
             ref=lambda name: f'gold.{name}', source=lambda schema,name: f'{schema}.{name}',
-            var=lambda name: {'as_of_date':'2026-01-31','start_date':'2026-01-01',
-                              'reporting_currency':'USD'}[name])
+            var=lambda name: self.variables[name])
         return sqlglot.transpile(sql, read='trino', write='duckdb')[0]
 
     def build(self):

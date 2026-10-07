@@ -19,6 +19,12 @@ lag needs comparison with log-end offsets, not event-time age alone. Alert on a
 failed reconciliation, repeated batch failure or stalled checkpoint. Datadog is
 deliberately omitted; no paid monitoring dependency is needed.
 
+The CLI JSON groups metrics under ingestion and releases. Release signals include
+current certification, publication age, business date, rejected rows, export row
+counts and release directories with recorded failures (including recovered runs).
+`--prometheus` emits numeric text metrics; no HTTP exporter or alert manager is
+installed. A publication age is not source-data freshness. See [releases](releases.md).
+
 GitHub Actions checks lint, contracts, local Iceberg, SQL, dbt parsing, Compose
 configuration and Terraform validation. It was authored locally, not run on GitHub.
 Manual distributed acceptance is restricted to a dedicated disposable Docker runner.

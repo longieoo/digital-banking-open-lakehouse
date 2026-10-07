@@ -25,8 +25,9 @@ def json_value(value):
 
 
 class PostgresSource:
-    def __init__(self, table):
+    def __init__(self, table, connection=None):
         self.table = table
+        self.connection = connection
         self.schema, self.key = TABLES[table]  # identifier allowlist
 
     def extract(self, start, limit, dates):
@@ -40,9 +41,13 @@ class PostgresSource:
         params = dates if dates else (start.updated_at, start.record_id, limit)
         if not dates:
             query += sql.SQL(" LIMIT %s")
-        with psycopg.connect(row_factory=dict_row, connect_timeout=10) as db:
-            db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
-            rows = db.execute(query, params).fetchall()
+        if self.connection is not None:
+            with self.connection.cursor(row_factory=dict_row) as cursor:
+                rows = cursor.execute(query, params).fetchall()
+        else:
+            with psycopg.connect(row_factory=dict_row, connect_timeout=10) as db:
+                db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+                rows = db.execute(query, params).fetchall()
         return [{k: json_value(v) for k, v in row.items()} for row in rows]
 
 

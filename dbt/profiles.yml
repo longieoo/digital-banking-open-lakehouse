@@ -8,6 +8,6 @@ banking:
       host: "{{ env_var('TRINO_HOST', 'localhost') }}"
       port: "{{ env_var('TRINO_PORT', '8080') | int }}"
       database: lake
-      schema: gold
+      schema: "{{ env_var('DBT_SCHEMA', 'gold') }}"
       threads: 2
       http_scheme: http

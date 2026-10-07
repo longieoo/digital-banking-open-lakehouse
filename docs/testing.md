@@ -32,6 +32,14 @@ spark-submit or in a configured Java/Spark environment. PostgreSQL/MinIO/REST:
 RUN_STACK=1 inside the bank container. CI lightweight jobs avoid live Azure; the
 optional full-stack workflow needs a sufficiently sized Docker runner.
 
+The primary acceptance entrypoint is `python -m scripts.release_acceptance` in a
+dedicated synthetic Compose environment. It builds certified January 31 and 30
+releases, verifies hashes, retries an existing ID, protects publication against
+date regression, and injects an incomplete dbt artifact failure. Its injected
+failure is not a simulated network outage. The release unit tests additionally
+cover partial exports, wrong build parameters, corruption and raw provenance.
+See [release runbook](releases.md) and the dated implementation validation ledger.
+
 Reconciliation FAIL is a visible test failure. Quarantine is retained evidence,
 not silently discarded records. Freshness is relative to synthetic January 2026
 data: compare against an explicit demo date, never pretend historical fixtures are

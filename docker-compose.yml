@@ -100,7 +100,7 @@ services:
     - core
     env_file: .env
     volumes:
-    - ./runtime:/opt/bank/runtime
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime
     command:
     - manifests
     image: banking-python:local
@@ -115,7 +115,7 @@ services:
     - processing
     env_file: .env
     volumes:
-    - ./runtime:/opt/bank/runtime
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime
     - spark-ivy:/opt/spark/.ivy2
     mem_limit: 4g
     depends_on:
@@ -152,7 +152,8 @@ services:
     - query
     env_file: .env
     volumes:
-    - ./runtime/dbt-target:/opt/bank/dbt/target
+    - ${BANK_RUNTIME_DIR:-./runtime}/dbt-target:/opt/bank/dbt/target
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime
     command:
     - build
     - --profiles-dir
@@ -169,7 +170,8 @@ services:
     env_file: .env
     volumes: &id003
     - airflow-data:/opt/airflow
-    - ./runtime:/opt/bank/runtime
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime
+    - spark-ivy:/opt/spark/.ivy2
     mem_limit: 4g
     command:
     - bash
@@ -265,7 +267,7 @@ services:
     - orchestration
     user: 0:0
     volumes:
-    - ./runtime:/runtime
+    - ${BANK_RUNTIME_DIR:-./runtime}:/runtime
     entrypoint:
     - python
     - -c

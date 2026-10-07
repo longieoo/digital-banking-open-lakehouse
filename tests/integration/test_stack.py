@@ -7,6 +7,29 @@ import unittest
 
 @unittest.skipUnless(os.environ.get('RUN_STACK')=='1','Set RUN_STACK=1 with disposable Docker services')
 class RealStackTest(unittest.TestCase):
+    def test_shared_read_snapshot_excludes_concurrent_commit(self):
+        import psycopg
+        from bank.adapters import PostgresSource, seed_postgres
+        from bank.generator import generate
+        from bank.ingestion import Watermark
+        seed_postgres(generate())
+        with psycopg.connect() as snapshot:
+            snapshot.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
+            source = PostgresSource('transactions',snapshot)
+            before = source.extract(Watermark(),1,None)[0]
+            try:
+                with psycopg.connect() as writer:
+                    writer.execute('UPDATE core.transactions SET channel=%s WHERE transaction_id=%s',
+                                   ('ATM' if before['channel']!='ATM' else 'BRANCH',before['transaction_id']))
+                self.assertEqual(source.extract(Watermark(),1,None)[0],before)
+                current = next(row for row in PostgresSource('transactions').extract(Watermark(),10000,None)
+                               if row['transaction_id']==before['transaction_id'])
+                self.assertNotEqual(current['channel'],before['channel'])
+            finally:
+                with psycopg.connect() as writer:
+                    writer.execute('UPDATE core.transactions SET channel=%s WHERE transaction_id=%s',
+                                   (before['channel'],before['transaction_id']))
+
     def test_postgres_minio_rest_recovery_backfill(self):
         from bank.adapters import PostgresSource,IcebergBronze,iceberg_catalog,raw_store,seed_postgres
         from bank.generator import generate

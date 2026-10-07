@@ -3,7 +3,7 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jre-headless && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/bank
 COPY . .
-RUN mkdir -p /opt/bank/runtime && chown -R airflow:0 /opt/bank
+RUN mkdir -p /opt/bank/runtime /opt/spark/.ivy2 && chown -R airflow:0 /opt/bank /opt/spark/.ivy2
 USER airflow
 RUN pip install --no-cache-dir apache-airflow==2.10.5 '.[runtime]' pyspark==3.5.5
 RUN pip install --no-cache-dir aiobotocore==2.23.1 && pip check

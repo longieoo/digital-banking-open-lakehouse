@@ -111,6 +111,10 @@ instructions and DAX are in bi/README.md. No PBIX or dashboard screenshots are c
 
 ## Stop / reset
 
+For explicit business dates, quality-gated publication, certified BI exports and
+retry instructions, use [the primary release runbook](releases.md). The earlier
+commands are the manual compatibility/E2E path.
+
 `docker compose --profile core --profile lakehouse --profile query --profile streaming --profile orchestration down`
 stops services but preserves data. Only when the demo data is no longer needed,
 add `--volumes` to remove named volumes and separately remove ./runtime. Never reset

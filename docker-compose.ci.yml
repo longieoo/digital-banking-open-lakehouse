@@ -1,0 +1,10 @@
+# Internal-only acceptance stack; requires Compose supporting !reset.
+services:
+  postgres:
+    ports: !reset []
+  minio:
+    ports: !reset []
+  catalog:
+    ports: !reset []
+  trino:
+    ports: !reset []

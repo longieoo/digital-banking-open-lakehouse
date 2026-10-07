@@ -8,8 +8,9 @@ The central question: **can a pipeline fail, retry and backfill without losing o
 
 - **PASS:** source invariants; ingestion recovery/backfill; real local Iceberg snapshots, time travel, schema evolution and reopen; actual Gold SQL business tests; reconciliation mismatch detection; dbt parsing; lint; Terraform init/fmt/validate.
 - **PASS (local Docker, 2026-09-16/17):** PostgreSQL/MinIO/REST recovery and backfill; Spark Silver and risk SQL; Trino/dbt (14 models + 31 data tests); streaming replay/checkpoint restart; Airflow Bronze → Silver → Gold; catalog/storage restart persistence.
+- **PASS (DE upgrade, 2026-10-07):** 45 local tests plus four real infrastructure tests; certified two-date releases, retry/failure publication protection; live dbt 15 models + 33 tests; Airflow bank_release execution and 100K/1M Spark join benchmarks. See [release runbook](docs/releases.md).
 - **UNAVAILABLE:** Azure deployment and Power BI Desktop artifact validation.
-- **Explicit substitute:** Gold tests run the actual dbt SQL through DuckDB translation against typed fixture Silver. This is not distributed E2E. The public FX endpoint returned HTTP 403; its fixture is labeled.
+- **Explicit substitute:** Gold unit tests run actual dbt SQL through DuckDB translation against typed fixture Silver. Distributed acceptance is recorded separately. Frankfurter v2 live extraction/ingestion passed on 2026-10-05; offline fixtures remain explicitly labeled.
 
 See the [validation ledger](docs/implementation-plan.md), [test boundaries](docs/testing.md) and [known limitations](docs/limitations.md). Code existence is not runtime validation. Fresh-clone local tests pass; a fresh
 Terraform initialization previously hit a local file-access error; a Linux-container
@@ -73,6 +74,13 @@ The measured small demo produces 113 source/real-Iceberg/Gold events, eight Cust
 
 ## Distributed platform
 
+The upgraded reporting path is a [certified data release](docs/releases.md): one
+PostgreSQL read snapshot, pinned Iceberg inputs, explicit business dates, strict
+Silver/dbt/reconciliation gates and atomic publication of a hashed BI export bundle.
+`python -m scripts.run_release` runs it after services/images and synthetic sources
+are ready. `bank_release` is its primary daily Airflow DAG. The commands below remain
+the manual compatibility path; their Gold tables are not a certified export release.
+
 Requires Docker Compose v2, Linux containers, image/Maven access and approximately 16 GB available RAM for a staged demo. Start named services as needed.
 
 ```sh
@@ -122,4 +130,7 @@ CI checks lint, contracts, local Iceberg, SQL, dbt parsing, Compose and Terrafor
 
 Repository modules: bank/ and sources/ for source/ingestion contracts; processing/ for Spark; dbt/ for Gold; streaming/, orchestration/, query/, infra/terraform/, tests/, benchmarks/, monitoring/, bi/ and docs/. No runtime data or Terraform state belongs in Git.
 
-Next priorities are measured Spark tuning, cloud identity validation and a genuine BI dashboard. Local Docker acceptance is now recorded in the validation ledger.
+The current release design is documented in [ADR 009](docs/adr/009-certified-data-releases.md).
+Further scale work is incremental processing, bounded streaming and table maintenance;
+an actual Power BI Desktop artifact is still a separate acceptance boundary. Azure/FX
+connections are treated as completed external inputs for the current upgrade scope.

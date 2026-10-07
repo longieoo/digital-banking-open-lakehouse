@@ -19,7 +19,7 @@ def batch(**context):
     run_all(dates=(start,end) if start else None)
 
 
-with DAG('bank_bronze',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule='0 2 * * *',
+with DAG('bank_bronze',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule=None,
          catchup=False,max_active_runs=1,default_args=DEFAULTS,
          params={'start_date':Param('',type='string'),'end_date':Param('',type='string')},
          tags=['banking','batch']) as bronze_dag:
@@ -30,9 +30,40 @@ with DAG('bank_silver',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedul
     BashOperator(task_id='spark_conformance',outlets=[SILVER],cwd='/opt/bank',bash_command=
         'spark-submit --master local[2] --packages '
         'org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.9.1,'
-        'org.apache.iceberg:iceberg-aws-bundle:1.9.1 processing/silver.py')
+        'org.apache.iceberg:iceberg-aws-bundle:1.9.1,'
+        'org.apache.iceberg:iceberg-azure-bundle:1.9.1 processing/silver.py')
 
 with DAG('bank_gold',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule=[SILVER],
          catchup=False,max_active_runs=1,default_args=DEFAULTS,tags=['banking']) as gold_dag:
     BashOperator(task_id='dbt_build_and_quality',cwd='/opt/bank/dbt',
                  bash_command='/opt/bank/dbt-venv/bin/dbt build --profiles-dir .')
+
+
+def prepare_release(**context):
+    import hashlib
+    import os
+    from bank.release import prepare
+    params = context['params']
+    value = hashlib.sha256(context['run_id'].encode()).hexdigest()[:32]
+    day = params['as_of_date'] or (context['data_interval_end'].date()-timedelta(days=1)).isoformat()
+    os.chdir('/opt/bank')
+    prepare(value,params['start_date'],day,params['currency'])
+    return value
+
+
+with DAG('bank_release',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule='0 2 * * *',
+         catchup=False,max_active_runs=1,default_args=DEFAULTS,
+         params={'start_date':Param('2026-01-01',type='string'),
+                 'as_of_date':Param('',type='string'),
+                 'currency':Param('USD',enum=['USD','EUR','VND'])},tags=['banking','certified']) as release_dag:
+    prepare_task = PythonOperator(task_id='prepare_snapshot',python_callable=prepare_release)
+    silver_task = BashOperator(task_id='validate_silver',cwd='/opt/bank',bash_command=
+        'spark-submit --master local[2] --conf spark.jars.ivy=/opt/spark/.ivy2 --packages '
+        'org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.9.1,'
+        'org.apache.iceberg:iceberg-aws-bundle:1.9.1,'
+        'org.apache.iceberg:iceberg-azure-bundle:1.9.1 processing/silver.py --release-id '
+        '"{{ ti.xcom_pull(task_ids=\'prepare_snapshot\') }}"')
+    publish_task = BashOperator(task_id='build_and_publish',cwd='/opt/bank',bash_command=
+        'python -m bank.release build --dbt-executable /opt/bank/dbt-venv/bin/dbt --release-id '
+        '"{{ ti.xcom_pull(task_ids=\'prepare_snapshot\') }}"')
+    prepare_task >> silver_task >> publish_task
