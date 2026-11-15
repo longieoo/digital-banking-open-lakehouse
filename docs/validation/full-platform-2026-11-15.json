@@ -258,7 +258,7 @@
     "azure_deployment_and_adls_identity": "UNAVAILABLE; no configured account/deployment",
     "native_power_bi_pbix_dax_execution": "UNAVAILABLE; runnable web BI is separately tested",
     "remote_github_ci": "NOT_RUN",
-    "browser_visual_qa": "NOT_VERIFIED; headless launch rejected and Computer Use could not establish browser URL",
+    "browser_visual_qa": "NOT_VERIFIED; HTTP and data-contract acceptance passed separately",
     "full_infrastructure_disaster_recovery": "NOT_IMPLEMENTED; bundle restore tested"
   },
   "wheel_sha256": "31ec2a21a08d9ab2963f9a3ed15733ec6cf52a203e7f34f1b1d6ef3127356cac"

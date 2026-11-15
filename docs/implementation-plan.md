@@ -180,7 +180,7 @@ the operating and external acceptance boundaries.
 - PASS: real dashboard HTTP data, filters/error boundaries and exporter readiness;
   monetary aggregation uses Decimal strings, a single currency and date-end balances.
   Five serving tests cover tampering and publication/read consistency. Browser visual
-  QA is NOT_VERIFIED because the computer-use helper could not establish browser URL.
+  QA remains NOT_VERIFIED; HTTP and data-contract acceptance are recorded separately.
 - PASS: current15-export certified-bundle backup/verify/restore without publication
   or overwrite; retention inventory protects referenced/current/in-progress releases.
 - PASS: Ruff, compilation, all Compose profiles, JavaScript syntax and complete wheel
