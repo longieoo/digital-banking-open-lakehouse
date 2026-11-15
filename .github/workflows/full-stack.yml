@@ -6,7 +6,7 @@ permissions:
 jobs:
   docker-e2e:
     # A dedicated disposable runner with >=16 GB RAM and Docker is required.
-    runs-on: [self-hosted, linux, lakehouse-demo]
+    runs-on: [self-hosted, linux, bank-lakehouse]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

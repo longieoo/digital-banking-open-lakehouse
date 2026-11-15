@@ -1,0 +1,265 @@
+{
+  "date": "2026-11-15",
+  "version": "0.2.0",
+  "status": "PASS_WITH_EXTERNAL_GATES",
+  "scope": "Complete educational local platform with synthetic data; not production acceptance",
+  "application_source_sha256": "495380781322a6400f5f053a394fa17522a5573335acdd20cbd9eef7a338774f",
+  "provenance": "Checks ran during the upgrade working tree; detailed per-release code digests remain in ignored runtime manifests.",
+  "environment": {
+    "compose_project": "bank-complete-20261115",
+    "runtime_isolated": true,
+    "docker_memory_gib": 7.6,
+    "unrelated_projects_untouched": true,
+    "heavy_checks": "staged sequentially"
+  },
+  "tests": {
+    "discovered": 96,
+    "local_pass": 91,
+    "local_skipped": 5,
+    "real_postgres_minio_rest_pass": 2,
+    "real_spark_pass": 2,
+    "linux_integrity_tests_pass": 3,
+    "skip_resolution": "4 opted-in infrastructure checks passed separately; Windows symlink creation was unavailable and its check passed on Linux"
+  },
+  "quality": {
+    "ruff": "PASS",
+    "compileall": "PASS",
+    "all_compose_profiles": "PASS",
+    "javascript_syntax": "PASS",
+    "wheel_build_and_module_asset_inventory": "PASS"
+  },
+  "release": {
+    "status": "PASS",
+    "current_release": "a767f633027b41138d10c8379b434a44",
+    "historical_release": "2efa3c2c2dcc4575989c19a756687cac",
+    "dbt_models": 15,
+    "dbt_tests": 33,
+    "dbt_steps_pass": 48,
+    "transactions": 225,
+    "customer_360": 20,
+    "daily_balances": 620,
+    "reconciliation_groups": 30,
+    "rejected": 0,
+    "exports_verified": 15,
+    "retry": "PASS",
+    "historical_pointer_protection": "PASS",
+    "failed_artifact_publication_protection": "PASS",
+    "fault_scope": "injected dbt artifact; not network outage"
+  },
+  "airflow": {
+    "bank_release_four_task_execution": "PASS",
+    "bank_fx_daily_live_execution": "PASS",
+    "dag_import": "PASS",
+    "long_running_schedule_history": "NOT_CLAIMED"
+  },
+  "fx": {
+    "status": "PASS",
+    "scope": "Real HTTP to raw/MinIO and Iceberg REST Bronze; replay of identical request",
+    "compose_project": "bank-complete-20261115",
+    "request_date": "2026-01-30",
+    "rate_date": "2026-01-30",
+    "origin": "LIVE",
+    "rate": "0.83803",
+    "pair": "USD/EUR",
+    "first_run_verified_count": 1,
+    "replay_verified_count": 1,
+    "persisted_bronze_versions": 1,
+    "manifest_count": 1,
+    "manifest_attempts": 2,
+    "same_batch_id": true,
+    "same_snapshot_id": true,
+    "snapshot_id": "9077788115069311850",
+    "forward_watermark_unchanged": true,
+    "provider": "Frankfurter v2",
+    "endpoint": "https://api.frankfurter.dev/v2/rate/USD/EUR",
+    "raw_sha256": "8ad2f86872573bb4677d15112798d30871863ba1a329676d06ad103e78b6d599",
+    "used_for_gold_conversion": false
+  },
+  "streaming": {
+    "status": "PASS",
+    "scope": "Real Redpanda -> Spark Structured Streaming -> Iceberg with producer replay and same checkpoint restart",
+    "compose_project": "bank-complete-20261115",
+    "topic_partitions": 3,
+    "producer_first_messages": 230,
+    "producer_replay_messages": 230,
+    "first": {
+      "stream_events": 225,
+      "distinct_events": 225,
+      "bronze_versions": 228,
+      "alerts": 0
+    },
+    "replay": {
+      "stream_events": 225,
+      "distinct_events": 225,
+      "bronze_versions": 228,
+      "alerts": 0
+    },
+    "bronze_versions_before_stream": 228,
+    "checkpoint_reused": true,
+    "consumer_mode": "availableNow",
+    "timings": [
+      {
+        "stage": "stream-before-bronze",
+        "seconds": 4.125
+      },
+      {
+        "stage": "stream-producer-first",
+        "seconds": 4.578
+      },
+      {
+        "stage": "stream-consumer-first",
+        "seconds": 139.234
+      },
+      {
+        "stage": "stream-first-events",
+        "seconds": 5.157
+      },
+      {
+        "stage": "stream-first-distinct",
+        "seconds": 4.718
+      },
+      {
+        "stage": "stream-first-bronze",
+        "seconds": 4.375
+      },
+      {
+        "stage": "stream-first-alerts",
+        "seconds": 4.625
+      },
+      {
+        "stage": "stream-producer-replay",
+        "seconds": 4.125
+      },
+      {
+        "stage": "stream-consumer-replay",
+        "seconds": 136.219
+      },
+      {
+        "stage": "stream-replay-events",
+        "seconds": 3.359
+      },
+      {
+        "stage": "stream-replay-distinct",
+        "seconds": 3.657
+      },
+      {
+        "stage": "stream-replay-bronze",
+        "seconds": 2.89
+      },
+      {
+        "stage": "stream-replay-alerts",
+        "seconds": 3.172
+      }
+    ],
+    "reseeded": false,
+    "publication": "Certified release bundle unchanged; stream convergence is a separate shared-Silver path"
+  },
+  "http": {
+    "status": "PASS",
+    "release_id": "a767f633027b41138d10c8379b434a44",
+    "summary": {
+      "transactions": 225,
+      "successful": 214,
+      "failed": 11,
+      "transaction_value": "509338.31",
+      "posted_value": "476341.62",
+      "net_posted_movement": "-126444.04",
+      "transfer_count": 10,
+      "transferred_value": "250.00",
+      "closing_balance": "-126444.04",
+      "balance_date": "2026-01-31",
+      "balance_accounts": 20,
+      "reconciliation_groups": 30,
+      "reconciliation_failed": 0
+    },
+    "invalid_filter_rejection": "PASS",
+    "numeric_metrics": 14,
+    "visual_browser_qa": "NOT_VERIFIED"
+  },
+  "backup_restore": {
+    "status": "PASS",
+    "scope": "certified_export_bundle",
+    "release_id": "a767f633027b41138d10c8379b434a44",
+    "exports": 15,
+    "published": false,
+    "created_at": "2026-11-15T13:22:14.448564+00:00"
+  },
+  "retention": "read-only plan; no object/schema/snapshot deletion",
+  "terraform": {
+    "terraform": "1.11.4",
+    "provider": "AzureRM 4.26.0",
+    "scope": "Offline configuration validation only; no Azure plan/apply/authentication",
+    "stages": [
+      {
+        "log": "terraform-final-retry.log",
+        "stage": "fmt",
+        "status": "PASS",
+        "exit_code": 0
+      },
+      {
+        "log": "terraform-final-retry.log",
+        "stage": "init",
+        "status": "PASS",
+        "exit_code": 0
+      },
+      {
+        "log": "terraform-final-retry.log",
+        "stage": "validate",
+        "status": "PASS",
+        "exit_code": 0
+      }
+    ],
+    "status": "PASS",
+    "initial_attempt": {
+      "stages": [
+        {
+          "stage": "fmt",
+          "log": "terraform-fmt.log",
+          "status": "PASS",
+          "exit_code": 0
+        },
+        {
+          "stage": "init",
+          "log": "terraform-init.log",
+          "status": "FAIL",
+          "exit_code": 1
+        },
+        {
+          "stage": "validate",
+          "log": "terraform-validate.log",
+          "status": "FAIL",
+          "exit_code": 1
+        }
+      ],
+      "blocker": "Docker shared memory pressure during concurrent Spark and Airflow build; init provider extraction reported cannot allocate memory",
+      "status": "FAIL"
+    },
+    "interrupted_retry": {
+      "log": "terraform-ephemeral-retry.log",
+      "reason": "Own ephemeral retry container stopped deliberately after coordinator requested deferral; not an OOM result or Terraform validation",
+      "exit_code": 137,
+      "status": "CANCELLED"
+    },
+    "final_retry": {
+      "data_directory": "ephemeral container /tmp/bank-terraform-data",
+      "init_flags": [
+        "-backend=false",
+        "-input=false",
+        "-lockfile=readonly"
+      ],
+      "azure_contact": "NOT_RUN",
+      "resource_note": "Retry ran after coordinator stopped only owned Airflow services and Spark completed",
+      "lockfile": "read-only and unchanged",
+      "infra_mount": "read-only",
+      "status": "PASS"
+    }
+  },
+  "external_gates": {
+    "azure_deployment_and_adls_identity": "UNAVAILABLE; no configured account/deployment",
+    "native_power_bi_pbix_dax_execution": "UNAVAILABLE; runnable web BI is separately tested",
+    "remote_github_ci": "NOT_RUN",
+    "browser_visual_qa": "NOT_VERIFIED; headless launch rejected and Computer Use could not establish browser URL",
+    "full_infrastructure_disaster_recovery": "NOT_IMPLEMENTED; bundle restore tested"
+  },
+  "wheel_sha256": "31ec2a21a08d9ab2963f9a3ed15733ec6cf52a203e7f34f1b1d6ef3127356cac"
+}

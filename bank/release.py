@@ -23,8 +23,12 @@ def release_id(value):
     return value
 
 
-def directory(value):
-    return Path(os.environ.get('RELEASE_ROOT','runtime/releases')) / release_id(value)
+def directory(value, root=None):
+    base = Path(root if root is not None else os.environ.get('RELEASE_ROOT','runtime/releases'))
+    path = base / release_id(value)
+    if path.is_symlink() or path.resolve().parent != base.resolve():
+        raise ValueError('Release path escapes configured root')
+    return path
 
 
 def atomic_json(path, document):
@@ -47,16 +51,24 @@ def atomic_json(path, document):
 def code_digest():
     root = Path(__file__).resolve().parent.parent
     digest = hashlib.sha256()
-    for folder in ('bank','processing','dbt','orchestration','streaming'):
+    for folder in ('bank','processing','dbt','orchestration','streaming','config','query','sources','docker','scripts'):
         for path in sorted((root/folder).rglob('*')):
-            if path.suffix in {'.py','.sql','.yml'} and path.name != '.user.yml' and not {'target','logs','__pycache__'} & set(path.parts):
+            if path.suffix in {'.py','.sql','.yml','.json','.html','.css','.js','.properties','.config','.Dockerfile','.example'} and path.name != '.user.yml' and not {'target','logs','__pycache__'} & set(path.parts):
                 digest.update(str(path.relative_to(root)).replace('\\','/').encode())
                 digest.update(path.read_bytes())
+    for name in ('pyproject.toml','requirements-test.txt','docker-compose.yml','docker-compose.ci.yml'):
+        path = root/name
+        if path.is_file():
+            digest.update(name.encode())
+            digest.update(path.read_bytes())
     return digest.hexdigest()
 
 
-def load(value):
-    document = json.loads((directory(value)/'release.json').read_text())
+def load(value, root=None):
+    path = directory(value,root)/'release.json'
+    if path.is_symlink():
+        raise ValueError('Release manifest must not be a symbolic link')
+    document = json.loads(path.read_text(encoding='utf-8'))
     if document['release_id']!=value or any(document[key]!=f'{layer}_r_{value}'
             for key,layer in [('bronze_schema','bronze'),('silver_schema','silver'),('gold_schema','gold')]):
         raise ValueError('Invalid release routing')
@@ -197,6 +209,7 @@ def certify(value, artifact_root, client=None):
                 digest.update(chunk)
         files[model] = dict(rows=count,sha256=digest.hexdigest(),file=f'exports/{model}.csv')
     document.update(status='CERTIFIED',certified_at=datetime.now(timezone.utc).isoformat(),exports=files,
+                    certified_models=models,
                     validation_code_digest=code_digest())
     publish(document)
     return document
@@ -222,20 +235,42 @@ def publish(document):
     return document
 
 
-def verify(value):
+def verify(value, root=None):
     """Verify a certified export after copying it to another machine or restoring it."""
-    document = load(value)
+    document = load(value,root)
     if document['status'] != 'CERTIFIED':
         raise ValueError('Release is not certified')
+    if not isinstance(document.get('exports'),dict) or not document['exports']:
+        raise ValueError('Certified exports are missing')
+    if 'certified_models' in document and (len(document['certified_models'])!=len(set(document['certified_models'])) or
+            set(document['certified_models'])!=set(document['exports'])):
+        raise ValueError('Certified model inventory mismatch')
     for model,metadata in document['exports'].items():
         if not re.fullmatch('[a-z][a-z0-9_]*',model) or metadata['file'] != f'exports/{model}.csv':
             raise ValueError('Invalid export path')
+        path = directory(value,root)/metadata['file']
+        if path.is_symlink() or path.parent.is_symlink() or path.resolve().parent != (directory(value,root)/'exports').resolve():
+            raise ValueError('Export path escapes certified bundle')
+        if type(metadata.get('rows')) is not int or metadata['rows'] < 0:
+            raise ValueError('Invalid export row count')
         digest = hashlib.sha256()
-        with (directory(value)/metadata['file']).open('rb') as handle:
+        with path.open('rb') as handle:
             for chunk in iter(lambda:handle.read(1024*1024),b''):
                 digest.update(chunk)
         if digest.hexdigest()!=metadata['sha256']:
             raise ValueError('Corrupt certified export')
+        with path.open(encoding='utf-8',newline='') as handle:
+            reader = csv.reader(handle)
+            header = next(reader,None)
+            if not header or len(set(header)) != len(header) or any(not name for name in header):
+                raise ValueError('Invalid certified export header')
+            count = 0
+            for row in reader:
+                if len(row) != len(header):
+                    raise ValueError('Malformed certified export row')
+                count += 1
+            if count != metadata['rows']:
+                raise ValueError('Certified export row count mismatch')
     return document
 
 

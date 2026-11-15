@@ -1,207 +1,57 @@
-# Final implementation report
+# Full implementation report version 0.2
 
-## Final status
+The educational banking platform implements PostgreSQL/file/API → Python/Airflow
+→ raw → Iceberg Bronze → Spark Silver → Trino/dbt Gold → certified BI consumption,
+with a Redpanda/Structured Streaming branch. Banking data is entirely synthetic.
+Source, tests, infrastructure and documentation remain in the full repository.
 
-The requested architecture and mandatory modules are implemented with coherent
-milestone commits. Available local validation passes. Distributed runtime acceptance
-remains open because Docker/Java were unavailable; this is not a claim of a fully
-validated production deployment. The project is a production-style educational
-platform with synthetic banking data only.
+## Completed operating and consumption path
 
-## Architecture implemented
+Version 0.2 adds a browser dashboard over verified certified CSV exports, read-only
+HTTP/Prometheus endpoints, bounded FX retries/provenance, a daily FX DAG and optional
+release prerequisite, verified bundle backup/restore, lifecycle inventory and cloud
+readiness/probe tooling. Source archives run releases without Git history; Python
+distributions include processing/streaming/scripts and dashboard assets. Docker
+contexts exclude runtime, private environment variants and Terraform caches/state.
 
-PostgreSQL core/card/GL sources, deterministic Python generator, durable ingestion
-control, immutable raw, MinIO and persistent Iceberg REST catalog configuration,
-real Iceberg Bronze adapter, Spark Silver, Trino, dbt Gold, Redpanda and Structured
-Streaming, Terraform ADLS/Key Vault, Airflow Datasets, CI, metrics and BI guidance.
-See [architecture and ER diagrams](architecture.md).
+Financial semantics remain explicit: customer SCD2 joins by event time; transfers
+have two posting legs and a separate once-per-transfer fact; failed events do not
+move balances; reversals are linked opposite postings. Decimal/NUMERIC and UTC are
+used. Measures require one currency; balances are evaluated at a date rather than
+summed through time. FX is reference data, not implicit conversion of Gold facts.
 
-## Data flow
+## Validation and result provenance
 
-Batch: sources → Python/Airflow → raw → Bronze Iceberg → Spark conformance/quarantine
-→ Silver Iceberg → Trino/dbt → Gold. Stream: synthetic events → Redpanda → Spark
-microbatch → shared immutable Bronze → shared Silver → rule alerts. MinIO and ADLS
-are environment alternatives. External FX is a separate explicitly labeled fixture
-ingestion because the live endpoint returned HTTP 403.
+The 2026-11-15 dedicated Compose acceptance builds actual PostgreSQL, MinIO, REST,
+Spark and Trino/dbt. The January 31 fixture has 225 transactions, 20 Customer 360 rows,
+620 daily balances, 30 passing reconciliation groups and 15 hashed exports. Retry
+preserves results; January 30 has 600 balances without moving current backward.
+An injected failed dbt artifact blocks publication; this is not a network outage.
 
-## Business capabilities
+Live USD/EUR reference FX for January 30 was extracted over HTTP and persisted in
+raw/real Iceberg. Replay retained one Bronze version and the same snapshot and
+forward watermark. Rates are dated reference observations, not current trading
+quotes. [Completion evidence](validation/full-platform-2026-11-15.json) records
+final verification results and skipped/unavailable gates.
 
-Six dimensions, four facts and four marts provide Customer 360, transaction trends,
-dense daily balances, branch/card analytics and financial reconciliation. Customer
-SCD2 preserves segment/branch/status intervals and historical transaction joins.
-Core postings include transfer legs; the transfer fact counts each transfer once.
-Failed events do not move balances; reversals remain separate linked opposite events.
+Historical evidence retains original dates in docs/validation. Earlier Docker
+unavailability or fixture-only results do not supersede newer acceptance. The
+Vietnamese Word report produced on 2026-10-08 describes the prior release; this
+guide and ADR 010 document later operating additions.
 
-The local demo actually produced **113 source/Iceberg/Gold events, 8 customer rows,
-248 daily balance rows and 0 reconciliation failures**. Silver is a typed fixture in
-that demonstration; the Gold SQL is the real model SQL, translated for DuckDB.
+## Remaining production and external gates
 
-## Technologies and responsibilities
+This is an executable educational local platform within its documented contract,
+not a production banking deployment. Single-host coordination, full Silver/Gold
+builds, retained stream history and simplified banking remain explicit boundaries.
+General CDC/hard deletes, multi-node HA and incremental late-correction equivalence
+require separate designs and load/failure evidence.
 
-PostgreSQL enforces operational integrity. Python extracts/generates/validates;
-Airflow orchestrates. Iceberg manages table state over object storage. Spark owns
-conformance, Trino query access and dbt analytical models. Redpanda transports events;
-Structured Streaming coordinates microbatch processing. Terraform owns Azure
-infrastructure. Docker profiles and GitHub Actions provide reproducibility/CI.
-Power BI is specified as the consumer, not fabricated as a binary artifact.
+Azure deployment, cloud catalog/compute authentication and ADLS identity enforcement
+need configured infrastructure/account access. A raw probe does not prove a cloud
+release. The web dashboard runs; native Power BI PBIX/DAX execution is separately
+unvalidated. Product-bundle restore is not full infrastructure recovery. Authored
+GitHub workflow source does not establish a remote CI execution.
 
-## Reliability guarantees
-
-Composite timestamp/ID cursor prevents timestamp ties being skipped. Canonical raw
-content hashes and immutable Bronze business-version keys enable safe replay.
-Raw and Bronze are read back before completion. Completed manifest and cursor update
-share a durable SQLite transaction. Failure leaves the cursor unchanged, including
-failure after Bronze commit; retry reuses prior work. Date-range backfill has its own
-manifest and does not mutate forward state. Cooperating writers use a single-host
-SQLite lock. These guarantees require monotonic source versions, no hard deletes,
-and the documented writer/cutoff contract; they are not distributed exactly-once.
-
-## Testing
-
-**35 tests discovered: 33 PASS, 2 SKIPPED, 0 failures/errors.** Skips are the real
-Spark and PostgreSQL/MinIO/REST service gates. Tests cover generator integrity,
-composite watermarks, duplicate/conflict handling, raw failure/corruption, commit
-failure, post-commit recovery, backfill, SQL business behavior, masking, routing,
-metrics and configuration. Actual local Iceberg tests cover snapshots, time travel,
-schema and partition evolution, manifests/data files, retry and catalog reopen.
-
-Lint, Python compilation and dbt 1.11.14/trino adapter 1.9.3 parsing pass. Gold/risk
-business SQL executes through DuckDB; it does not prove Trino/Spark interoperability.
-See [machine-readable local results](validation/local-tests.json) and
-[clean-clone results](validation/clean-clone.json). The clone reused the installed
-test dependencies; no untracked project files were copied.
-
-## Data quality
-
-Conformance rejects invalid fields, references, currencies, monetary scale and
-reversal links. dbt checks uniqueness, required keys, SCD interval overlap, one
-current customer, transfer legs, card/core agreement, dense balance continuity,
-missing balance activity and reconciliation. Mismatch tests detect missing Bronze,
-missing Gold, duplicated versions, unbalanced journals, balanced wrong amounts and
-balanced GL misallocation. FAIL is visible in both the mart and dbt gate.
-
-## Security
-
-All identities are SYN identifiers; email uses .invalid and no card/PIN/CVV data
-exists. Gold excludes direct PII and uses masked display labels. PostgreSQL has
-masked views/NOLOGIN roles; Trino has Gold-only analyst rules. Runtime writers share
-a dedicated container UID and persistent directory. Secrets, runtime files, keys,
-Terraform state and plans are ignored. Manifest/CLI errors are sanitized.
-Local Trino usernames are unauthenticated and REST is a local fixture: authenticated
-shared deployment is an explicit remaining security gate.
-
-## Streaming
-
-Version-derived event IDs, account partition keys, persistent offsets/checkpoints,
-durable deduplication, late-arrival audit and deterministic SQL rules are implemented.
-Tests validate identity, amount boundaries and transfer-window behavior. Broker and
-actual Structured Streaming restart are UNAVAILABLE. Retained history is recomputed
-per batch; alerts are observations rather than automatically retracted decisions.
-
-## Cloud / Terraform
-
-Terraform 1.11.4 and AzureRM 4.26.0 **init/fmt/validate PASS** using verified release
-archives. Resources include Resource Group, HNS-enabled storage, raw/warehouse,
-scoped pipeline RBAC, restricted network access and RBAC Key Vault. Windows/Linux
-provider archive hashes are in the lock file. No Azure plan/apply, ADLS I/O, identity
-test or cost measurement occurred. Cloud catalog hosting/identity remains manual. A fresh-clone initialization attempt subsequently
-failed with a local checksum file-access error, even with verified local archives.
-Working-repository validation still passes; fresh Terraform installation remains
-an explicit external recheck.
-
-## Performance experiments
-
-Actual single-process Windows local-file measurements at 1K and 10K rows are saved
-in [local-measurements.json](performance/local-measurements.json). These are single
-samples with cache/setup noise, not a statistical or distributed benchmark. The
-Iceberg path includes key verification and metadata commit. Spark/JDBC experiment
-scripts exist but no timing numbers are claimed without their runtime.
-
-## Validation matrix
-
-| Component | Status | Evidence / limit |
-|---|---|---|
-| Generator/business invariants | PASS | Deterministic/reference/GL/transfer tests |
-| PostgreSQL service/constraints | UNAVAILABLE | DDL and real gate supplied; no Docker |
-| Ingestion/recovery/backfill | PASS | Contract tests and actual local Iceberg demo |
-| MinIO + REST deployment | UNAVAILABLE | Persistent Compose config; real gate supplied |
-| Real local Iceberg format | PASS | Snapshots, time travel, evolution, metadata/reopen |
-| Spark runtime | UNAVAILABLE | Compiled implementation; runtime test SKIPPED |
-| Trino runtime/dbt materialization | UNAVAILABLE | SQL models supplied; no query service |
-| dbt parsing / Gold business SQL | PASS | Adapter parse and actual SQL contract tests |
-| Reconciliation | PASS | Good data and five controlled mismatch tests |
-| Airflow runtime | UNAVAILABLE | Thin Dataset DAGs; syntax checks only |
-| Rule SQL/event identity | PASS | Deterministic local tests |
-| Redpanda/checkpoint restart | UNAVAILABLE | Broker/client code; no running runtime |
-| External live rates | UNAVAILABLE | HTTP 403; fixture explicitly labeled |
-| Security hygiene/masking | PASS | Code/config tests; shared identity enforcement pending |
-| Terraform configuration | PASS | init, fmt, validate |
-| Azure deployment/I/O | UNAVAILABLE | No credentials; no resources deployed |
-| Local benchmark | PASS | Only saved measured samples |
-| Spark/JDBC benchmark | UNAVAILABLE | Executable experiment; no fabricated results |
-| GitHub Actions hosted run | UNAVAILABLE | Workflow configuration exists; not published/run |
-| Power BI artifact | UNAVAILABLE | Semantic guide/DAX supplied; no PBIX |
-| Clean-clone local gate | PASS | 33 tests, lint, hygiene, demo and dbt parse at commit 19505de |
-| Fresh-clone Terraform init | FAIL | Local provider checksum file-access error; working-repository validate still PASS |
-
-## Repository structure
-
-bank/ contains generators, ingestion, adapters, metadata runner and metrics; sources/
-contains PostgreSQL and external contracts. processing/, query/, dbt/, streaming/
-and orchestration/ implement the data path. infra/terraform/, docker/ and workflows
-configure runtime. tests/, benchmarks/, monitoring/, bi/ and docs/ provide acceptance,
-measurement, consumption and explanation. No empty placeholder modules were created.
-
-## Git milestones
-
-See [the milestone history](validation/git-milestones.txt). Commits progress through
-bootstrap, sources, reliable ingestion, Iceberg, Spark, Trino, dbt, reconciliation,
-performance, orchestration, streaming, quality/security, Terraform, CI/BI and final
-correctness/documentation review. No remote was created or pushed.
-
-## Known limitations
-
-The [limitations register](limitations.md) distinguishes implementation from runtime
-acceptance: single-host control, full Silver/Gold scans, memory-resident generation/
-backfill, simplified banking assumptions, stable audit cutoffs, unbounded retained
-stream history, unauthenticated local identities, missing cloud catalog deployment
-and unavailable BI execution. Nothing is represented as production banking or ML fraud.
-
-## Manual validations still required
-
-Run the real Docker E2E and Spark tests, test broker restart/duplicate replay, inspect
-Airflow import errors and Dataset runs, verify analyst deny rules under real auth,
-measure Spark/JDBC workloads, deploy Azure only with an authorized account, and build
-a genuine Power BI model. These are concrete runtime gates, not claims of completed tests.
-
-## How to run locally
-
-Install requirements-test.txt and run `python -m unittest discover -s tests -v`, then
-`python -m scripts.local_demo`. For the full stack, generate ignored .env and follow
-[docs/demo.md](demo.md). `python scripts/e2e.py` runs the dedicated Docker acceptance.
-
-## How to deploy Azure resources
-
-Follow [Azure steps](azure.md): authenticate, fill demo.tfvars from the example,
-init/fmt/validate, review plan, apply, validate identities/I/O and destroy the demo
-afterward. [Cost controls](cloud-cost.md) explain persistence and soft deletion.
-
-## Portfolio highlights
-
-The strongest demonstrated evidence is failure-safe ingestion, real Iceberg table
-state, historical customer modeling, exact dense balances, and reconciliation that
-detects balanced-but-wrong journals. The documentation explains both guarantees
-and failure boundaries without inflated claims.
-
-## Interview defense topics
-
-[Twenty-five grounded answers](interview-defense.md) cover cursors, replay, backfill,
-Iceberg, Spark shuffles, Trino/dbt boundaries, fact grains, SCD2, balances, GL, Kafka,
-late events, ADLS, Terraform, masking and 10x-volume trade-offs. Coursework mappings
-reuse the same implementation rather than maintaining duplicate projects.
-
-## Next steps
-
-Execute the outstanding distributed acceptance gates first. Then replace measured
-full-history bottlenecks, validate cloud identity and build BI artifacts. Keep the
-architecture frozen until those results justify a specific change.
+See [full lifecycle commands](full-platform.md), [limitations](limitations.md),
+[ADR 010](adr/010-full-local-operation.md) and [release contract](releases.md).

@@ -1,4 +1,40 @@
-# Power BI implementation specification
+# Certified BI dashboard and Power BI specification
+
+## Runnable local dashboard
+
+The built-in dashboard is a read-only web application for the actual certified
+CSV bundle. It does not require Power BI or any third-party frontend CDN.
+
+```sh
+python -m bank.serving --root runtime/releases --port 8090
+```
+
+Open http://127.0.0.1:8090 after a release has been certified. The four pages cover
+overview, Customer 360, transactions and financial reconciliation. Currency and
+transaction date filters use only Gold exports. A release ID, business date and
+SHA-256 verification status are visible. API `GET /api/report` returns the same
+source-backed values; optional query keys are `currency`, `start`, `end`.
+`GET /health` returns 200 only when the current certified bundle verifies.
+Missing or corrupt certified data returns 503, with no fallback to fixtures.
+
+Each request resolves current.json once, verifies every manifest export, then
+hashes the exact bytes parsed for serving. Thus a pointer change cannot mix two
+releases. Monetary JSON values are Decimal strings; display formatting avoids
+conversion to JavaScript floating-point numbers. Each monetary result has one
+native currency, without implicit FX conversion. Closing balance uses the last
+available date at or before the selected end, never a sum across dates. Customer
+360 stays at the certified as-of date and its fixed 30-day window, independently
+of the transaction range. The recent-transaction table is limited to 100 rows;
+summary totals include all selected events. Counts and chart heights are numeric.
+
+The server binds loopback by default and exposes only three static assets and
+two read APIs. It cannot browse the filesystem or serve arbitrary export paths.
+Use the Docker Compose dashboard profile for the packaged service. This local
+HTTP server has no user authentication and is not a public internet endpoint.
+Shared deployments need an authenticated TLS reverse proxy and restricted storage
+access. The entire dashboard dataset is synthetic and Gold excludes raw PII.
+
+## Power BI Desktop boundary
 
 No PBIX was generated. Power BI Desktop/driver/GUI validation was UNAVAILABLE.
 Install a supported Trino/Starburst ODBC driver on the BI workstation, configure a

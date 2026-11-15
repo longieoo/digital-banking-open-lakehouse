@@ -7,7 +7,22 @@ import subprocess
 from time import perf_counter
 import uuid
 
-from bank.release import directory, load, dbt_vars, atomic_json, release_id
+from bank.release import directory, load, dbt_vars, atomic_json, release_id, code_digest
+
+
+def code_revision(root=None):
+    """Source archives remain runnable without Git or a .git history directory."""
+    root = Path(root or Path(__file__).resolve().parent.parent)
+    if not (root/'.git').exists():
+        return 'source-sha256:'+code_digest()
+    try:
+        git = ['git','-c',f'safe.directory={root.as_posix()}','-C',str(root)]
+        revision = subprocess.check_output([*git,'rev-parse','HEAD'],text=True,stderr=subprocess.DEVNULL).strip()
+        if subprocess.check_output([*git,'status','--porcelain'],text=True,stderr=subprocess.DEVNULL).strip():
+            revision += '-dirty'
+        return revision
+    except (OSError,subprocess.CalledProcessError):
+        return 'source-sha256:'+code_digest()
 
 
 def main():
@@ -19,11 +34,7 @@ def main():
     args = parser.parse_args()
     os.environ.setdefault('RELEASE_ROOT',str(Path(os.environ.get('BANK_RUNTIME_DIR','runtime'))/'releases'))
     value = release_id(args.release_id)
-    revision = subprocess.check_output(['git','-c',f'safe.directory={Path.cwd().as_posix()}',
-                                        'rev-parse','HEAD'],text=True).strip()
-    if subprocess.check_output(['git','-c',f'safe.directory={Path.cwd().as_posix()}',
-                                'status','--porcelain'],text=True).strip():
-        revision += '-dirty'
+    revision = code_revision()
     compose = ['docker','compose']
     measurements = []
 

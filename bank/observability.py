@@ -27,8 +27,14 @@ def release_metrics(root='runtime/releases'):
     pointer = root/'current.json'
     if not pointer.exists():
         return dict(certified_current=0,releases_with_recorded_failures=failures)
-    current = json.loads(pointer.read_text())
-    document = json.loads((root/current['manifest']).read_text())
+    from bank.release import verify, release_id
+    if pointer.is_symlink():
+        raise ValueError('Invalid publication pointer')
+    current = json.loads(pointer.read_text(encoding='utf-8'))
+    value = release_id(current['release_id'])
+    if current.get('manifest')!=f'{value}/release.json':
+        raise ValueError('Invalid manifest route')
+    document = verify(value,root=root)
     age = (datetime.now(timezone.utc)-datetime.fromisoformat(document['certified_at'])).total_seconds()
     return dict(certified_current=int(document['status']=='CERTIFIED'),releases_with_recorded_failures=failures,
                 current_release_id=document['release_id'],business_date=document['as_of_date'],

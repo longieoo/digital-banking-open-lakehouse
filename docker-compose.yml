@@ -162,6 +162,7 @@ services:
       runtime-init:
         condition: service_completed_successfully
   airflow-init:
+    image: ${COMPOSE_PROJECT_NAME:-digital-banking-open-lakehouse}-airflow:local
     build: &id001
       context: .
       dockerfile: docker/airflow.Dockerfile
@@ -183,6 +184,7 @@ services:
       runtime-init:
         condition: service_completed_successfully
   airflow-scheduler:
+    image: ${COMPOSE_PROJECT_NAME:-digital-banking-open-lakehouse}-airflow:local
     build: *id001
     profiles: *id002
     env_file: .env
@@ -201,6 +203,7 @@ services:
       timeout: 15s
       retries: 10
   airflow-webserver:
+    image: ${COMPOSE_PROJECT_NAME:-digital-banking-open-lakehouse}-airflow:local
     build: *id001
     profiles: *id002
     env_file: .env
@@ -226,6 +229,7 @@ services:
     image: docker.redpanda.com/redpandadata/redpanda:v25.1.3
     profiles:
     - streaming
+    - streaming-worker
     command:
     - redpanda
     - start
@@ -255,6 +259,64 @@ services:
       timeout: 5s
       retries: 20
     mem_limit: 1g
+  stream-consumer:
+    build:
+      context: .
+      dockerfile: docker/spark.Dockerfile
+    profiles: [streaming-worker]
+    env_file: .env
+    command: [streaming/consumer.py]
+    volumes:
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime
+    - spark-ivy:/opt/spark/.ivy2
+    mem_limit: 3g
+    depends_on:
+      runtime-init:
+        condition: service_completed_successfully
+      redpanda:
+        condition: service_healthy
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+    image: banking-python:local
+    profiles: [bi]
+    entrypoint: [python, -m, bank.serving]
+    command: [--host, 0.0.0.0, --port, '8090', --root, /opt/bank/runtime/releases]
+    volumes:
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime:ro
+    ports:
+    - 127.0.0.1:${BANK_BI_PORT:-8090}:8090
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+  metrics:
+    build:
+      context: .
+      dockerfile: docker/python.Dockerfile
+    image: banking-python:local
+    profiles: [monitoring]
+    entrypoint: [python, -m, bank.exporter]
+    command: [--host, 0.0.0.0, --port, '9091', --control, /opt/bank/runtime/control.db, --root, /opt/bank/runtime/releases]
+    volumes:
+    - ${BANK_RUNTIME_DIR:-./runtime}:/opt/bank/runtime:ro
+    ports:
+    - 127.0.0.1:${BANK_METRICS_PORT:-9091}:9091
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:9091/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
   runtime-init:
     build:
       context: .
@@ -265,6 +327,7 @@ services:
     - processing
     - query
     - orchestration
+    - streaming-worker
     user: 0:0
     volumes:
     - ${BANK_RUNTIME_DIR:-./runtime}:/runtime

@@ -17,6 +17,14 @@ from the data interval, supports explicit manual dates/currency, and allows one
 active run. Related facts, dimensions and controls accompany historical replay;
 forward ingestion watermarks do not move. See [release runbook](releases.md).
 
+Version 0.2 adds `refresh_reference_fx` before those three release tasks. Its
+`fetch_live_fx` parameter defaults false for reproducible offline historical runs;
+when enabled, a failed LIVE reference fetch blocks that release. `bank_fx_daily`
+is the separate daily04:00UTC FX pipeline, with rate-date freshness checks, bounded
+HTTP retry and immutable raw/Bronze replay. Reference FX is not Gold conversion.
+The full-platform lifecycle can explicitly unpause both schedules with
+`--all --enable-schedules`. New DAGs remain paused until that choice is made.
+
 The three older Dataset DAGs remain a manual compatibility demo. bank_bronze has
 no automatic schedule. Their mutable Gold tables are separate from the certified
 CSV publication boundary. Existing task retries retain idempotent ingestion.

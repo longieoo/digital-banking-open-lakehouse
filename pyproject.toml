@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "digital-banking-open-lakehouse"
-version = "0.1.0"
+version = "0.2.0"
 description = "Production-style educational banking data platform"
 requires-python = ">=3.11"
 dependencies = []
@@ -18,7 +18,10 @@ streaming = ["confluent-kafka==2.10.0"]
 bank = "bank.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["bank*"]
+include = ["bank*", "processing*", "streaming*", "benchmarks*", "scripts*"]
+
+[tool.setuptools.package-data]
+bank = ["web/*.html", "web/*.js", "web/*.css"]
 
 [tool.ruff]
 line-length = 110

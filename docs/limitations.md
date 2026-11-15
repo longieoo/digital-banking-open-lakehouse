@@ -1,47 +1,38 @@
-# Known limitations and remaining acceptance gates
+# Validation boundaries and production extensions
 
-1. Local Docker validation now covers PostgreSQL/MinIO/REST, Spark Silver, Trino/dbt,
-   Airflow and broker/checkpoint restart (2026-09-16/17). This is a small single-host
-   demonstration, not production or scale acceptance. The SQLite-backed REST fixture
-   uses one JDBC client to avoid metadata write locks after restart.
-2. Local Iceberg uses a persistent SQL catalog test setup; deployment uses REST.
-   Passing the local test does not validate the REST image, credentials or Docker networking.
-3. Azure Terraform init/fmt/validate pass; no account, plan, apply, ADLS I/O or identity
-   validation occurred. Cloud REST hosting/authentication is a manual prerequisite.
-4. Full Silver and Gold refreshes favor correctness/explainability over scale.
-   Large generator/backfill batches are memory-resident. Spark benchmark scripts
-   exist but no distributed timing is claimed.
-5. The SQLite control lock is single-host. All cooperating Bronze writers must use
-   it. Direct external writers can violate unique business-version assumptions.
-   No cross-layer atomicity, exactly-once transport or arbitrary-source CDC is claimed.
-6. Forward ingestion requires monotonic updated_at and no hard deletes. Delayed
-   commits behind the watermark need explicit backfill. Source historical versions
-   never observed are not recoverable from a mutable transaction source.
-7. Reconciliation needs a stable source cutoff. Control totals are refreshed before
-   ingestion, not atomically with every later engine read. Freeze writes during audit.
-8. USD fixture only; amounts stay native-currency. Zero opening balances, unrestricted
-   overdrafts, descriptive account status and simplified cash/deposit GL are educational
-   assumptions. Account/card dimensions are current-state, customer is SCD2.
-9. Streaming recomputes retained history per batch; it accepts/audits late events
-   instead of maintaining bounded event-time state. Alert observations are retained
-   after corrections. Standalone streaming requires an explicit downstream dbt refresh.
-10. Frankfurter v2 live ingestion passed on 2026-10-05; its fixture remains invented.
-    Connections to Azure/FX are assumed complete for the upgrade scope; this does
-    not convert historical NOT RUN records into newly observed cloud validation.
-11. Trino HTTP usernames are unauthenticated locally; role rules and masking are a
-    demonstration, not a shared-network security perimeter. Catalog fixture is local-only.
-12. No real Power BI artifact/screenshots, GitHub CI run, Datadog deployment or paid
-    service was fabricated. No production banking or large-scale performance claim.
+See [full operation](full-platform.md) and [completion evidence](validation/full-platform-2026-11-15.json).
+Historical validation JSON files retain their original dates.
 
-Fresh-clone Terraform init previously encountered a local provider-checksum
-file-access error. A subsequent Linux-container run of Terraform 1.11.4 passed
-fmt, init and validate with AzureRM 4.26.0. Historical validation/clean-clone.json
-retains its original result. No Azure resources were deployed.
-
-The new release path (ADR 009) closes business-date, common-read-snapshot, paged
-dependent-backfill and last-good-publication gaps for the documented source contract.
-It still fully builds isolated Silver/Gold, uses a single-host lock, and serves
-certified local CSVs. It does not implement multi-table SQL publication, general
-CDC/delete processing, distributed HA or a Power BI Desktop artifact. Source control
-totals are now derived from the same read transaction as source data; legacy
-uncoordinated manual writer paths must not be used as certification evidence.
+1. Actual local storage/catalog, Spark, Trino/dbt, recovery and release publication
+   are tested on synthetic data. This is single-host acceptance, not production
+   load/HA. The REST fixture serializes SQLite JDBC connections.
+2. Certified releases capture source tables/controls in one PostgreSQL REPEATABLE
+   READ view and pin Iceberg snapshots. Legacy manual paths are not certification
+   evidence. No cross-table distributed transaction or exactly-once transport claim.
+3. Forward loading requires monotonic updated_at and no general hard deletes.
+   Explicit paged backfill handles documented corrections. Unobserved overwritten
+   source versions cannot be reconstructed. General CDC/delete needs its own contract.
+4. Silver/Gold fully rebuild; coordination and release schemas are single-host.
+   Incremental recomputation, HA, compaction/expiration and large end-to-end benchmarks
+   remain extensions. The lifecycle planner never deletes snapshots or raw history.
+5. Streaming supports finite draining/checkpoint replay but recomputes retained
+   history. Alerts do not retract automatically. maxOffsetsPerTrigger bounds input,
+   not retained state. Certified Gold still requires a separate release job.
+6. Values stay native-currency. Live and fixture FX are separated; same-day provider
+   restatements yield explicit version conflicts. Weekend reference dates can precede
+   the requested date within the freshness bound. No live trading-rate claim.
+7. Zero opening balances, unrestricted demo overdrafts, descriptive account status,
+   simplified cash/deposit GL and current-state account/card dimensions are educational
+   assumptions. Customer is SCD2. This is not regulatory accounting.
+8. BI/metrics bind to localhost via Compose. Shared deployment requires authentication,
+   TLS and network controls. Trino HTTP usernames and the REST fixture do not provide
+   a shared-network security boundary.
+9. Backup verifies certified files/reconciliation, not PostgreSQL, object versions,
+   catalog/control databases or checkpoints. Hashes provide integrity, not signatures.
+10. Cloud preflight/probe does not replace actual Azure deployment, ADLS role/ACL
+    checks, catalog/compute authentication and a certified cloud release. Terraform
+    validate is not deployment. See [Azure acceptance](azure-acceptance.md).
+11. The browser dashboard is implemented; Power BI DAX/model guidance is retained,
+    but no executed native PBIX is fabricated. Remote GitHub CI needs separate evidence.
+12. Third-party deprecation notices may appear. Versions remain pinned to the tested
+    interoperable stack; this upgrade does not claim every dependency is newest.

@@ -4,6 +4,24 @@ A **production-style educational banking data platform** built around recoverabl
 
 The central question: **can a pipeline fail, retry and backfill without losing or double-counting financial events—and can we prove agreement with the ledger?**
 
+## Complete local platform version 0.2
+
+The full source includes a certified-data web dashboard, HTTP health/Prometheus
+metrics, scheduled/retryable LIVE FX, verified product backup/restore, lifecycle
+inventory and Azure readiness/probe tools. No batch, streaming, tests, Terraform,
+DAX or coursework modules have been removed.
+
+Start with [the full operation guide](docs/full-platform.md). After installing
+requirements-test.txt, run `python -m scripts.platform up --internal --all --seed`
+on a dedicated demo project. Explicit `--seed` replaces its synthetic source;
+omit it to preserve existing data. BI: `http://127.0.0.1:8090`;
+metrics: `http://127.0.0.1:9091/metrics`. Concurrent operation benefits from16GB+
+Docker memory; acceptance can run in stages on smaller hosts.
+
+[Current summary](docs/final-report.md) ·
+[Completion evidence](docs/validation/full-platform-2026-11-15.json) ·
+[Azure acceptance](docs/azure-acceptance.md)
+
 ## Validation at a glance
 
 - **PASS:** source invariants; ingestion recovery/backfill; real local Iceberg snapshots, time travel, schema evolution and reopen; actual Gold SQL business tests; reconciliation mismatch detection; dbt parsing; lint; Terraform init/fmt/validate.

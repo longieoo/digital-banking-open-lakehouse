@@ -51,11 +51,38 @@ def prepare_release(**context):
     return value
 
 
+def refresh_reference_fx(**context):
+    """Optional release prerequisite; no implicit fixture fallback or Gold conversion."""
+    from bank.fx import ingest_live_fx
+    params = context['params']
+    if not params['fetch_live_fx']:
+        return {'status':'DISABLED','used_for_gold_conversion':False}
+    day = params['as_of_date'] or (context['data_interval_end'].date()-timedelta(days=1)).isoformat()
+    return ingest_live_fx(day,max_age_days=params['fx_max_age_days'])
+
+
+def daily_reference_fx(**context):
+    from bank.fx import ingest_live_fx
+    day = (context['data_interval_end'].date()-timedelta(days=1)).isoformat()
+    return ingest_live_fx(day,max_age_days=context['params']['fx_max_age_days'])
+
+
+with DAG('bank_fx_daily',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule='0 4 * * *',
+         catchup=False,max_active_runs=1,default_args=DEFAULTS,
+         params={'fx_max_age_days':Param(7,type='integer',minimum=0,maximum=30)},
+         tags=['banking','fx','reference']) as fx_dag:
+    PythonOperator(task_id='ingest_live_reference_rates',python_callable=daily_reference_fx)
+
+
 with DAG('bank_release',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedule='0 2 * * *',
          catchup=False,max_active_runs=1,default_args=DEFAULTS,
          params={'start_date':Param('2026-01-01',type='string'),
                  'as_of_date':Param('',type='string'),
-                 'currency':Param('USD',enum=['USD','EUR','VND'])},tags=['banking','certified']) as release_dag:
+                 'currency':Param('USD',enum=['USD','EUR','VND']),
+                 'fetch_live_fx':Param(False,type='boolean'),
+                 'fx_max_age_days':Param(7,type='integer',minimum=0,maximum=30)},
+         tags=['banking','certified']) as release_dag:
+    fx_task = PythonOperator(task_id='refresh_reference_fx',python_callable=refresh_reference_fx)
     prepare_task = PythonOperator(task_id='prepare_snapshot',python_callable=prepare_release)
     silver_task = BashOperator(task_id='validate_silver',cwd='/opt/bank',bash_command=
         'spark-submit --master local[2] --conf spark.jars.ivy=/opt/spark/.ivy2 --packages '
@@ -66,4 +93,4 @@ with DAG('bank_release',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedu
     publish_task = BashOperator(task_id='build_and_publish',cwd='/opt/bank',bash_command=
         'python -m bank.release build --dbt-executable /opt/bank/dbt-venv/bin/dbt --release-id '
         '"{{ ti.xcom_pull(task_ids=\'prepare_snapshot\') }}"')
-    prepare_task >> silver_task >> publish_task
+    fx_task >> prepare_task >> silver_task >> publish_task

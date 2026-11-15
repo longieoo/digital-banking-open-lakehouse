@@ -153,3 +153,44 @@ the existing host runtime directory, so filesystem control state was not isolate
 from earlier local runs. Forward watermarks stay unchanged during release replay.
 Full incremental Silver/Gold, general CDC/deletes, distributed locking, retention/
 compaction and shared-service authentication remain explicitly bounded follow-ups.
+
+## Full local platform completion 2026 11 15
+
+Version0.2 retains all existing batch/streaming/modeling/infrastructure modules and
+adds executable certified BI, HTTP readiness/metrics, scheduled/retryable LIVE FX,
+verified product backup/restore, safe lifecycle planning, cloud preflight/probe,
+source distribution and full-platform startup/status/stop commands. ADR010 records
+the operating and external acceptance boundaries.
+
+- PASS: 96 tests discovered;91 run locally and5 skip. The four opted-in real
+  infrastructure tests pass separately; the Windows-unavailable symlink test passes
+  on Linux as part of three integrity tests. No skip is represented as a local pass.
+- PASS: dedicated, filesystem-isolated Compose release acceptance;225 transactions,
+  20 Customer360 rows,620 balances,30 reconciliation groups and15 verified exports.
+  Live Trino/dbt completes15 models plus33 tests; retry, historical publication
+  protection and injected failed-artifact rejection pass.
+- PASS: the upgraded four-task bank_release and bank_fx_daily execute in Airflow.
+  Scheduler/webserver startup health also passes. This is not a long-running
+  scheduling history; enabling daily schedules is an explicit lifecycle option.
+- PASS: real HTTP FX → raw/MinIO → Iceberg Bronze; replay retains one version and
+  one snapshot, with unchanged forward watermark and explicit LIVE provenance.
+- PASS: real Redpanda producer230messages plus230replay; two availableNow Spark
+  drains reuse the checkpoint and retain225 unique events and228 Bronze versions.
+  Extra versions come from actual source-update integration checks; alert count0.
+- PASS: real dashboard HTTP data, filters/error boundaries and exporter readiness;
+  monetary aggregation uses Decimal strings, a single currency and date-end balances.
+  Five serving tests cover tampering and publication/read consistency. Browser visual
+  QA is NOT_VERIFIED because the computer-use helper could not establish browser URL.
+- PASS: current15-export certified-bundle backup/verify/restore without publication
+  or overwrite; retention inventory protects referenced/current/in-progress releases.
+- PASS: Ruff, compilation, all Compose profiles, JavaScript syntax and complete wheel
+  module/assets inventory. Docker contexts now exclude Terraform/provider caches
+  and private env variants; source archives no longer require Git history to run.
+- PASS: Terraform1.11.4/AzureRM4.26 fmt/init/validate using ephemeral TF_DATA_DIR and
+  read-only infra/lockfile. Initial shared-memory failure and deliberately cancelled
+  retry remain recorded. No Azure authentication/plan/apply was attempted.
+
+Evidence: [full-platform-2026-11-15.json](validation/full-platform-2026-11-15.json).
+Detailed logs stay in ignored runtime/completion-2026-11-15. Remote GitHub CI,
+authenticated Azure release, native PBIX/DAX execution and whole-infrastructure DR
+remain distinct unvalidated/unimplemented gates; no production-completion claim.

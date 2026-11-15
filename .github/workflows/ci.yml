@@ -27,7 +27,8 @@ jobs:
         env:
           DBT_SEND_ANONYMOUS_USAGE_STATS: 'false'
       - run: python scripts/check_repository.py
-      - run: cp .env.example .env && docker compose --profile core --profile lakehouse --profile processing --profile query --profile streaming --profile orchestration config --quiet
+      - run: cp .env.example .env && docker compose --profile '*' config --quiet
+      - run: python -m pip wheel --no-deps --wheel-dir runtime/wheels .
   terraform:
     runs-on: ubuntu-latest
     steps:
@@ -55,6 +56,11 @@ jobs:
       # The demo runtime is owned by container UID 50000; this dedicated Docker
       # runner needs host permission to write evidence beside container artifacts.
       - run: sudo --preserve-env=COMPOSE_PROJECT_NAME,COMPOSE_FILE "$(command -v python)" -m scripts.release_acceptance
+      - name: Start complete consumption and operating services
+        run: sudo --preserve-env=COMPOSE_PROJECT_NAME,COMPOSE_FILE "$(command -v python)" -m scripts.platform up --project "$COMPOSE_PROJECT_NAME" --runtime runtime --internal --all --no-release
+      - name: Verify reporting and operational HTTP readiness
+        run: |
+          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=30); urllib.request.urlopen('http://127.0.0.1:9091/ready', timeout=30)"
       - name: Collect readable evidence without raw data or credentials
         if: always()
         run: |
@@ -66,5 +72,5 @@ jobs:
         with:
           name: release-evidence
           path: ci-evidence/
-      - run: docker compose --profile core --profile lakehouse --profile query stop
+      - run: docker compose --profile '*' stop
         if: always()

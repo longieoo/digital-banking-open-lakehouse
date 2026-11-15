@@ -65,19 +65,30 @@ def _consume_batch(batch, batch_number):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--available-now',action='store_true',help='Drain available offsets then exit; preserve checkpoint')
+    parser.add_argument('--max-offsets-per-trigger',type=int,default=10000)
+    args = parser.parse_args()
+    if args.max_offsets_per_trigger < 1:
+        parser.error('Positive max offsets required')
     from pyspark.sql import functions as F
     from pyspark.sql.types import StructType,StructField,StringType
     spark = session()
     schema = StructType([StructField(c,StringType()) for c in ['event_id','event_type','event_time','payload']])
     kafka = (spark.readStream.format('kafka').option('kafka.bootstrap.servers',os.environ['KAFKA_BOOTSTRAP_SERVERS'])
-        .option('subscribe','bank.transactions').option('startingOffsets','earliest').option('failOnDataLoss','true').load())
+        .option('subscribe','bank.transactions').option('startingOffsets','earliest')
+        .option('maxOffsetsPerTrigger',args.max_offsets_per_trigger).option('failOnDataLoss','true').load())
     events = kafka.select(F.col('value').cast('string').alias('raw_event')).select(
         'raw_event',F.from_json('raw_event',schema).alias('event')).select('raw_event','event.*')
     events = events.withColumn('event_time',F.to_timestamp('event_time'))
-    query = (events.writeStream.foreachBatch(consume_batch)
-        .option('checkpointLocation',os.environ.get('STREAM_CHECKPOINT','/opt/bank/runtime/checkpoints/transactions'))
-        .trigger(processingTime='10 seconds').start())
-    query.awaitTermination()
+    writer = (events.writeStream.foreachBatch(consume_batch)
+        .option('checkpointLocation',os.environ.get('STREAM_CHECKPOINT','/opt/bank/runtime/checkpoints/transactions')))
+    writer = writer.trigger(availableNow=True) if args.available_now else writer.trigger(processingTime='10 seconds')
+    try:
+        writer.start().awaitTermination()
+    finally:
+        spark.stop()
 
 
 if __name__ == '__main__':

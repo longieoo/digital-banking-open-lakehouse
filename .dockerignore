@@ -1,5 +1,7 @@
 .git
 .env
+**/.env.*
+!**/.env.example
 .venv
 runtime
 work
@@ -7,3 +9,17 @@ __pycache__
 **/__pycache__
 dbt/target
 dbt/logs
+.ruff_cache
+.pytest_cache
+**/*.egg-info
+**/.terraform
+**/*.tfstate*
+**/*.tfvars
+!**/*.tfvars.example
+**/*.plan
+**/*.pem
+**/*.key
+**/*.log
+**/*.zip
+dbt/dbt_packages
+dbt/.user.yml
