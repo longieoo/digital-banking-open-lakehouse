@@ -1,9 +1,15 @@
-# Full implementation report version 0.2
+# Full implementation report version 0.3
 
 The educational banking platform implements PostgreSQL/file/API → Python/Airflow
 → raw → Iceberg Bronze → Spark Silver → Trino/dbt Gold → certified BI consumption,
 with a Redpanda/Structured Streaming branch. Banking data is entirely synthetic.
 Source, tests, infrastructure and documentation remain in the full repository.
+
+Version 0.3 closes concrete defects in concurrent release builds, partial export
+installation, current streaming alert corrections, same-day FX restatements and
+unauthenticated HTTP consumption. The [hardening guide](hardening.md) describes the
+changes and [its acceptance record](validation/hardening-2026-11-15.json) separates
+actual infrastructure checks from local tests and external deployment gates.
 
 ## Completed operating and consumption path
 

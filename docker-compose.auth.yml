@@ -1,0 +1,16 @@
+# Local protected serving. The lifecycle CLI reads a private token file on the host
+# and passes its value through the Compose environment, never command arguments.
+# Container administrators can inspect env, as with PostgreSQL demo credentials.
+services:
+  dashboard:
+    environment:
+      BANK_HTTP_TOKEN: ${BANK_HTTP_TOKEN:?Supply BANK_HTTP_TOKEN or use platform --auth-token-file}
+      BANK_HTTP_TOKEN_EXPIRES_AT: ${BANK_HTTP_TOKEN_EXPIRES_AT:-}
+      BANK_HTTP_ALLOWED_HOSTS: ${BANK_HTTP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1}
+    command: [--host, 0.0.0.0, --port, '8090', --root, /opt/bank/runtime/releases, --require-auth]
+  metrics:
+    environment:
+      BANK_HTTP_TOKEN: ${BANK_HTTP_TOKEN:?Supply BANK_HTTP_TOKEN or use platform --auth-token-file}
+      BANK_HTTP_TOKEN_EXPIRES_AT: ${BANK_HTTP_TOKEN_EXPIRES_AT:-}
+      BANK_HTTP_ALLOWED_HOSTS: ${BANK_HTTP_ALLOWED_HOSTS:-localhost,127.0.0.1,::1}
+    command: [--host, 0.0.0.0, --port, '9091', --control, /opt/bank/runtime/control.db, --root, /opt/bank/runtime/releases, --require-auth]

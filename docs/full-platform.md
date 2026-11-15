@@ -1,4 +1,4 @@
-# Full platform operation version 0.2
+# Full platform operation version 0.3
 
 This repository retains all source, batch/stream processing, dbt models, tests,
 infrastructure definitions, BI measures and operational tools. The certified
@@ -54,7 +54,7 @@ interval sets the business day; the local fixture itself is still January2026 da
 - `http://127.0.0.1:8090`: interactive read-only certified-data dashboard.
 - `http://127.0.0.1:9091/metrics`: numeric Prometheus exposition.
 - `http://127.0.0.1:9091/status`: sanitized operational JSON.
-- `http://127.0.0.1:9091/health`: process liveness.
+- `http://127.0.0.1:9091/health`: process liveness; no release metadata is exposed.
 - `http://127.0.0.1:9091/ready`: 200 only with readable control state and a
   certified bundle whose CSV hashes and row counts validate; otherwise 503.
 - `http://127.0.0.1:8081`: Airflow when orchestration is started; local `.env`
@@ -84,8 +84,12 @@ transient failures and honors a bounded Retry-After; no fixture is substituted f
 an HTTP failure. Both requested date and actual published rate date are recorded.
 `bank_fx_daily` runs at 04:00 UTC. `bank_release` optionally gates on reference FX
 when its `fetch_live_fx` parameter is true; default false permits offline historical
-reproduction. A provider restatement of the same day is rejected as a version conflict.
+reproduction. Provider restatements receive locally observed versions; identical
+replay reuses its identity and earlier raw/Bronze observations remain available.
 These are reference rates; native Gold monetary measures are not silently converted.
+
+Protected serving, token rotation, concurrent-build guarantees and current-alert
+correction semantics are described in [the hardening guide](hardening.md).
 
 ## Backup restore and lifecycle planning
 

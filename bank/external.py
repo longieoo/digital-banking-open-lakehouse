@@ -17,7 +17,7 @@ URL = 'https://api.frankfurter.dev/v2/rate/USD/EUR'
 
 def fetch_content(url, *, timeout=20, attempts=3, backoff=1, max_delay=60):
     """Retry only transient failures, with bounded work and Retry-After support."""
-    if not 0 < timeout <= 120 or not 1 <= attempts <= 5 or not 0 <= backoff <= max_delay <= 120:
+    if type(attempts) is not int or not 0 < timeout <= 120 or not 1 <= attempts <= 5 or not 0 <= backoff <= max_delay <= 120:
         raise ValueError('Invalid FX HTTP retry policy')
     request = Request(url,headers={'User-Agent':'bank-lakehouse/0.2','Accept':'application/json'})
     for attempt in range(attempts):
@@ -57,7 +57,7 @@ def fetch_content(url, *, timeout=20, attempts=3, backoff=1, max_delay=60):
 def rates(live=False, *, as_of_date=None, max_age_days=None, today=None,
           timeout=20, attempts=3):
     reference = date.fromisoformat(as_of_date) if as_of_date else (today or datetime.now(timezone.utc).date())
-    if max_age_days is not None and (isinstance(max_age_days,bool) or not 0 <= max_age_days <= 30):
+    if max_age_days is not None and (type(max_age_days) is not int or not 0 <= max_age_days <= 30):
         raise ValueError('FX maximum age must be between 0 and 30 days')
     if live:
         if reference > (today or datetime.now(timezone.utc).date()):
@@ -99,6 +99,10 @@ if __name__ == '__main__':
     parser.add_argument('--as-of-date',help='Fetch a historical rate, allowing the preceding published rate')
     parser.add_argument('--max-age-days',type=int,help='Maximum calendar days before the requested date')
     args = parser.parse_args()
+    if args.live and not args.fetch_only:
+        from bank.fx import ingest_live_fx
+        print(json.dumps(ingest_live_fx(args.as_of_date,max_age_days=args.max_age_days if args.max_age_days is not None else 7)))
+        raise SystemExit(0)
     rows = rates(args.live,as_of_date=args.as_of_date,max_age_days=args.max_age_days)
     if args.fetch_only:
         print(json.dumps(rows))

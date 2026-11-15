@@ -45,6 +45,11 @@ the cloud storage path, with deployment and identity acceptance documented separ
   reconciliation must pass before a release replaces the current reporting bundle.
   A failed build leaves the previous certified output available.
 
+Version 0.3 also serializes concurrent writers for the same release, stages exports
+before publication, retracts current rule alerts after corrections, preserves FX
+restatement observations, and offers protected dashboard/metrics access. See the
+[hardening guide](docs/hardening.md) for guarantees and operating commands.
+
 The [architecture guide](docs/architecture.md), [release contract](docs/releases.md)
 and [ADRs](docs/adr/010-full-local-operation.md) explain the implementation and tradeoffs.
 
@@ -107,8 +112,8 @@ python -m unittest discover -s tests -v
 ruff check .
 ```
 
-The recorded Windows run discovers **96 tests: 91 pass and 5 skip**. The four
-infrastructure tests pass separately against PostgreSQL/MinIO/REST and Spark;
+The v0.3 Windows run discovers **121 tests: 115 pass and 6 skip**. The five
+infrastructure tests are exercised separately against PostgreSQL/MinIO/REST and Spark;
 the symlink test unavailable on Windows passes on Linux. These scopes are kept
 separate from the local test result.
 
@@ -128,7 +133,8 @@ Airflow DAG execution, streaming replay with the same checkpoint, and verified b
 backup/restore. In the streaming run, two deliveries of 230 messages retain 225 unique
 events and 228 Bronze versions; the additional versions come from source-update tests.
 
-[Validation records](docs/validation/full-platform-2026-11-15.json) ·
+[Latest hardening results](docs/validation/hardening-2026-11-15.json) ·
+[Platform acceptance](docs/validation/full-platform-2026-11-15.json) ·
 [Test boundaries](docs/testing.md) ·
 [GitHub Actions](https://github.com/longieoo/digital-banking-open-lakehouse/actions)
 

@@ -2,8 +2,9 @@ import hashlib
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
-from bank.release import atomic_json, verify
+from bank.release import _DigestReader, atomic_json, verify
 
 
 class ReleaseIntegrityTest(unittest.TestCase):
@@ -28,12 +29,33 @@ class ReleaseIntegrityTest(unittest.TestCase):
                 verify(value,root=root)
 
     def test_malformed_csv_and_duplicate_header_block_readers(self):
-        for content in ['id,id\nx,x\n','id,amount\nx,1,extra\n']:
+        for content in ['id,id\nx,x\n','id,amount\nx,1,extra\n','id,amount\n"unterminated,1\n']:
             with self.subTest(content=content), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 value,_ = self.bundle(root,content=content)
                 with self.assertRaises(ValueError):
                     verify(value,root=root)
+
+    def test_mutation_during_csv_stream_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            content = 'id,amount\n'+''.join(f'row{i},10.00\n' for i in range(5000))
+            value,path = self.bundle(root,content=content,rows=5000)
+            original = _DigestReader.readinto
+            changed = []
+            def mutate(reader,buffer):
+                size = original(reader,buffer)
+                if size and not changed:
+                    with path.open('r+b') as writer:
+                        writer.seek(30000)
+                        writer.write(b'Z')
+                        writer.flush()
+                    changed.append(True)
+                return size
+            with patch.object(_DigestReader,'readinto',mutate):
+                with self.assertRaises(ValueError):
+                    verify(value,root=root)
+            self.assertEqual(changed,[True])
 
     def test_symlink_export_cannot_escape_trusted_root(self):
         with tempfile.TemporaryDirectory() as tmp:

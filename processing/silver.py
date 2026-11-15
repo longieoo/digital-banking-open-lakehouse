@@ -161,6 +161,12 @@ def main():
 
 
 def release(spark, value):
+    from bank.release import release_lock
+    with release_lock(value):
+        return _release_locked(spark,value)
+
+
+def _release_locked(spark, value):
     from bank.release import load, directory, atomic_json
     from bank.pipeline import DATED_TABLES, RELATED_TABLES
     from bank.ingestion import utc

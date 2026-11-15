@@ -36,6 +36,7 @@ def main():
     parser.add_argument('--bi-port',type=int,default=8090)
     parser.add_argument('--metrics-port',type=int,default=9091)
     parser.add_argument('--as-of-date',default='2026-01-31')
+    parser.add_argument('--auth-token-file',help='Private host file enabling protected BI and metrics')
     args = parser.parse_args()
     if args.enable_schedules and not args.all:
         parser.error('--enable-schedules requires --all')
@@ -48,7 +49,16 @@ def main():
     os.environ['RELEASE_ROOT'] = str(Path(args.runtime).resolve()/'releases')
     os.environ['BANK_BI_PORT'] = str(args.bi_port)
     os.environ['BANK_METRICS_PORT'] = str(args.metrics_port)
-    os.environ['COMPOSE_FILE'] = os.pathsep.join(['docker-compose.yml']+(['docker-compose.ci.yml'] if args.internal else []))
+    files = ['docker-compose.yml']+(['docker-compose.ci.yml'] if args.internal else [])
+    if args.auth_token_file:
+        from bank.http_security import TokenAuth
+        try:
+            auth = TokenAuth(token_file=args.auth_token_file)
+            os.environ['BANK_HTTP_TOKEN'] = auth.secret()
+        except (ValueError,OSError):
+            raise SystemExit('HTTP token file is missing or invalid') from None
+        files.append('docker-compose.auth.yml')
+    os.environ['COMPOSE_FILE'] = os.pathsep.join(files)
     compose = ['docker','compose']
 
     def run(*command):
@@ -80,6 +90,7 @@ def main():
                 run(*compose,'exec','-T','redpanda','rpk','topic','create','bank.transactions','--partitions','3')
             # The shared Silver dimensions must exist before stream conformance.
             run(*compose,'run','--rm','spark','processing/silver.py')
+            run(*compose,'run','--rm','spark','streaming/consumer.py','--reconcile-alerts')
             run(*compose,'run','--rm','--entrypoint','python','bank','-m','streaming.producer')
             run(*compose,'--profile','streaming-worker','up','-d','stream-consumer')
             if args.enable_schedules:

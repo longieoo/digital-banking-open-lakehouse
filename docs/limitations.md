@@ -15,24 +15,29 @@ Historical validation JSON files retain their original dates.
 4. Silver/Gold fully rebuild; coordination and release schemas are single-host.
    Incremental recomputation, HA, compaction/expiration and large end-to-end benchmarks
    remain extensions. The lifecycle planner never deletes snapshots or raw history.
-5. Streaming supports finite draining/checkpoint replay but recomputes retained
-   history. Alerts do not retract automatically. maxOffsetsPerTrigger bounds input,
-   not retained state. Certified Gold still requires a separate release job.
+5. Streaming supports finite draining/checkpoint replay and retracts current alerts
+   after corrections. Risk computation scopes affected accounts, but Silver still
+   scans retained history. maxOffsetsPerTrigger bounds input, not retained state.
+   Current alerts and their audit are recoverable commits, not one cross-table
+   transaction. Certified Gold remains a separate release job.
 6. Values stay native-currency. Live and fixture FX are separated; same-day provider
-   restatements yield explicit version conflicts. Weekend reference dates can precede
-   the requested date within the freshness bound. No live trading-rate claim.
+   restatements preserve monotonic locally observed versions. Those timestamps are
+   not provider-authored revisions. Weekend reference dates can precede the request
+   within the freshness bound. No live trading-rate claim.
 7. Zero opening balances, unrestricted demo overdrafts, descriptive account status,
    simplified cash/deposit GL and current-state account/card dimensions are educational
    assumptions. Customer is SCD2. This is not regulatory accounting.
-8. BI/metrics bind to localhost via Compose. Shared deployment requires authentication,
-   TLS and network controls. Trino HTTP usernames and the REST fixture do not provide
-   a shared-network security boundary.
+8. BI/metrics bind to localhost via Compose and support required Bearer authentication,
+   rotating secret files, expiry and host/origin guards. Shared deployment still
+   requires TLS, request limits and network controls. Trino HTTP usernames and the
+   REST fixture do not provide a shared-network identity boundary.
 9. Backup verifies certified files/reconciliation, not PostgreSQL, object versions,
    catalog/control databases or checkpoints. Hashes provide integrity, not signatures.
 10. Cloud preflight/probe does not replace actual Azure deployment, ADLS role/ACL
     checks, catalog/compute authentication and a certified cloud release. Terraform
     validate is not deployment. See [Azure acceptance](azure-acceptance.md).
 11. The browser dashboard is implemented; Power BI DAX/model guidance is retained,
-    but no executed native PBIX is fabricated. Remote GitHub CI needs separate evidence.
+    but native PBIX execution and visual browser QA remain separate gates. GitHub-hosted
+    contracts and Terraform passed for v0.2; distributed CI requires a dedicated runner.
 12. Third-party deprecation notices may appear. Versions remain pinned to the tested
     interoperable stack; this upgrade does not claim every dependency is newest.

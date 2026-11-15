@@ -4,11 +4,13 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+import threading
 from unittest.mock import patch
 
 from bank.ingestion import FileRaw, MemorySource, SQLiteBronze, State, Watermark, ingest
 from bank.pipeline import PagedBackfill
-from bank.release import atomic_json, certify, check_build, dbt_vars, release_id, verify
+from bank.release import atomic_json, build, certify, check_build, dbt_vars, publish, release_id, verify
 
 
 class ReleaseTest(unittest.TestCase):
@@ -20,6 +22,9 @@ class ReleaseTest(unittest.TestCase):
                                               'CONTROL_PATH':str(self.root/'control.db')})
         self.environ.start()
         self.addCleanup(self.environ.stop)
+        models = patch('bank.release.project_models',return_value={'mart_reconciliation_daily'})
+        models.start()
+        self.addCleanup(models.stop)
         self.value = 'a'*32
         self.document = dict(release_id=self.value,start_date='2026-01-01',as_of_date='2026-01-31',
             reporting_currency='USD',gold_schema='gold_r_'+self.value,silver_schema='silver_r_'+self.value,
@@ -99,6 +104,86 @@ class ReleaseTest(unittest.TestCase):
             certify(self.value,self.artifacts,Client())
         self.assertEqual(before,pointer.read_bytes())
         self.assertEqual(json.loads((self.release/'release.json').read_text())['status'],'SILVER_READY')
+        self.assertFalse((self.release/'exports').exists())
+        self.assertEqual(list(self.release.glob('.export-build-*')),[])
+
+    def test_concurrent_certifiers_export_once_and_reuse_certified_bytes(self):
+        entered,finish = threading.Event(),threading.Event()
+        calls = []
+        class Client:
+            def scalar(self,sql):
+                return 0 if 'WHERE' in sql else 1
+            def pages(self,sql):
+                calls.append(sql)
+                entered.set()
+                if not finish.wait(4):
+                    raise TimeoutError('Test export stalled')
+                yield {'columns':[{'name':'reconciliation_status'}],'data':[['PASS']]}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(certify,self.value,self.artifacts,Client())
+            self.assertTrue(entered.wait(2))
+            second = pool.submit(certify,self.value,self.artifacts,Client())
+            try:
+                self.assertFalse(second.done())
+            finally:
+                finish.set()
+            self.assertEqual(first.result(timeout=5),second.result(timeout=5))
+        self.assertEqual(len(calls),1)
+        self.assertEqual(verify(self.value)['status'],'CERTIFIED')
+
+    def test_certified_build_is_not_reexecuted_and_manifest_cannot_be_rewritten(self):
+        class Client:
+            def scalar(self,sql):
+                return 0 if 'WHERE' in sql else 1
+            def pages(self,sql):
+                yield {'columns':[{'name':'reconciliation_status'}],'data':[['PASS']]}
+        document = certify(self.value,self.artifacts,Client())
+        before = (self.release/'release.json').read_bytes()
+        with patch('subprocess.run') as dbt:
+            self.assertEqual(build(self.value),document)
+            dbt.assert_not_called()
+        changed = {**document,'as_of_date':'2026-02-01'}
+        with self.assertRaisesRegex(ValueError,'immutable'):
+            publish(changed)
+        self.assertEqual((self.release/'release.json').read_bytes(),before)
+
+    def test_build_requires_every_project_model_not_only_self_consistent_artifacts(self):
+        with patch('bank.release.project_models',return_value={'mart_reconciliation_daily','fct_transactions'}):
+            with self.assertRaisesRegex(ValueError,'inventory'):
+                check_build(self.document,self.artifacts)
+
+    def test_retry_after_manifest_write_failure_preserves_old_pointer_and_staged_bytes(self):
+        pointer = self.root/'releases/current.json'
+        atomic_json(pointer,{'release_id':'b'*32,'as_of_date':'2026-01-30'})
+        before = pointer.read_bytes()
+        class Client:
+            def scalar(self,sql):
+                return 0 if 'WHERE' in sql else 1
+            def pages(self,sql):
+                yield {'columns':[{'name':'reconciliation_status'}],'data':[['PASS']]}
+        original = atomic_json
+        def fail_manifest(path,document):
+            if Path(path)==self.release/'release.json':
+                raise IOError('Interrupted manifest publication')
+            return original(path,document)
+        with patch('bank.release.atomic_json',side_effect=fail_manifest):
+            with self.assertRaises(IOError):
+                certify(self.value,self.artifacts,Client())
+        self.assertEqual(pointer.read_bytes(),before)
+        self.assertEqual(json.loads((self.release/'release.json').read_text())['status'],'SILVER_READY')
+        self.assertTrue((self.release/'exports/mart_reconciliation_daily.csv').exists())
+        self.assertEqual(certify(self.value,self.artifacts,Client())['status'],'CERTIFIED')
+        self.assertEqual(json.loads(pointer.read_text())['release_id'],self.value)
+        self.assertEqual(len(list(self.release.glob('.uncertified-exports-*'))),1)
+
+    def test_atomic_json_serialization_failure_keeps_old_file_without_temp_leak(self):
+        target = self.root/'atomic.json'
+        atomic_json(target,{'valid':True})
+        before = set(self.root.iterdir())
+        with self.assertRaises(TypeError):
+            atomic_json(target,{'invalid':{1,2}})
+        self.assertEqual(json.loads(target.read_text()),{'valid':True})
+        self.assertEqual(set(self.root.iterdir()),before)
 
     def test_backfill_is_bounded_and_preserves_forward_cursor(self):
         rows = [dict(transaction_id=f'T{i}',updated_at='2026-01-02T00:00:00+00:00',

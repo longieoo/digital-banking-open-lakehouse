@@ -1,0 +1,220 @@
+{
+  "version": "0.3.0",
+  "verification_date": "2026-11-15",
+  "finalized_on": "2026-11-16",
+  "status": "PASS_WITH_EXTERNAL_GATES",
+  "scope": "Synthetic educational local platform correctness/security hardening",
+  "provenance": "Validation ran in the upgrade working tree. Per-engine digests cover source installed in that image, so prepare and dbt validation digests may differ.",
+  "local_tests": {
+    "discovered": 121,
+    "passed": 115,
+    "skipped": 6,
+    "skips": "5 opt-in infrastructure tests; one Windows symlink creation restriction"
+  },
+  "real_infrastructure": {
+    "postgres_minio_rest_tests": 2,
+    "spark_tests": 3,
+    "status": "PASS",
+    "spark_correction_scope": "Scratch namespaces: legacy alert repair, all rule types, account/status correction, policy change, audit/current interrupted commit and retry",
+    "postgres_scope": "Disposable separate bank-hardening-checks-20261115 project, stopped afterward; primary source not reseeded"
+  },
+  "concurrent_release": {
+    "status": "PASS",
+    "scope": "Two concurrent real dbt CLI builds and certification for the same prepared release",
+    "release_id": "9bdbe32271664b308a0281431cd39942",
+    "dbt_executions": 1,
+    "dbt_steps_pass": 48,
+    "immutable_identical_certificates": true,
+    "exports_verified": 15,
+    "rows": {
+      "dim_account": 20,
+      "dim_branch": 2,
+      "dim_card": 20,
+      "dim_currency": 1,
+      "dim_customer": 27,
+      "dim_date": 31,
+      "dim_transaction_type": 7,
+      "fct_account_balance_daily": 620,
+      "fct_card_transactions": 66,
+      "fct_transactions": 225,
+      "fct_transfers": 10,
+      "mart_branch_card_daily": 39,
+      "mart_customer_360": 20,
+      "mart_reconciliation_daily": 30,
+      "mart_transaction_daily": 163
+    },
+    "code_revision": "5760ce710e327502d7f1c04dd8243b59b1dc5593-dirty",
+    "prepare_code_digest": "36e46aab454bc8381369c5f5829cd487e142b3f0a63b74b823bc87b4d2425ca5",
+    "validation_code_digest": "6cf796dd92a063663fcc17f9933b59e980a8eae798afbd13a764cc1b398c1795"
+  },
+  "protected_http": {
+    "status": "PASS",
+    "release_id": "9bdbe32271664b308a0281431cd39942",
+    "summary": {
+      "transactions": 225,
+      "successful": 214,
+      "failed": 11,
+      "transaction_value": "509338.31",
+      "posted_value": "476341.62",
+      "net_posted_movement": "-126444.04",
+      "transfer_count": 10,
+      "transferred_value": "250.00",
+      "closing_balance": "-126444.04",
+      "balance_date": "2026-01-31",
+      "balance_accounts": 20,
+      "reconciliation_groups": 30,
+      "reconciliation_failed": 0
+    },
+    "invalid_filter_rejection": "PASS",
+    "numeric_metrics": 14,
+    "authentication": "PASS",
+    "visual_browser_qa": "NOT_VERIFIED"
+  },
+  "streaming_replay": {
+    "status": "PASS",
+    "scope": "Real producer replay and availableNow checkpoint reuse with current-alert reconciliation",
+    "project": "bank-complete-20261115",
+    "first": {
+      "events": 225,
+      "unique_events": 225,
+      "bronze_versions": 228,
+      "current_alerts": 0,
+      "observations": 0
+    },
+    "replay": {
+      "events": 225,
+      "unique_events": 225,
+      "bronze_versions": 228,
+      "current_alerts": 0,
+      "observations": 0
+    },
+    "producer_messages_each": 230,
+    "financial_versions_added": 0,
+    "checkpoint_reused": true,
+    "reseeded": false,
+    "alert_state": "CURRENT",
+    "rule_correction_acceptance": "Separate isolated Spark test passes current retractions and immutable audit retry",
+    "stages": [
+      {
+        "stage": "before-bronze",
+        "seconds": 4.031,
+        "exit_code": 0
+      },
+      {
+        "stage": "producer-1",
+        "seconds": 3.953,
+        "exit_code": 0
+      },
+      {
+        "stage": "consumer-1",
+        "seconds": 83.844,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-1-events",
+        "seconds": 3.047,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-1-unique",
+        "seconds": 2.234,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-1-bronze",
+        "seconds": 2.266,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-1-current-alerts",
+        "seconds": 2.656,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-1-observations",
+        "seconds": 1.969,
+        "exit_code": 0
+      },
+      {
+        "stage": "producer-2",
+        "seconds": 3.406,
+        "exit_code": 0
+      },
+      {
+        "stage": "consumer-2",
+        "seconds": 125.609,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-2-events",
+        "seconds": 5.516,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-2-unique",
+        "seconds": 4.125,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-2-bronze",
+        "seconds": 4.031,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-2-current-alerts",
+        "seconds": 2.485,
+        "exit_code": 0
+      },
+      {
+        "stage": "after-2-observations",
+        "seconds": 2.14,
+        "exit_code": 0
+      },
+      {
+        "stage": "risk-policy",
+        "seconds": 2.125,
+        "exit_code": 0
+      }
+    ],
+    "manual_reconcile": {
+      "status": "PASS",
+      "duration_seconds": 44.172,
+      "mode": "--reconcile-alerts; no Kafka input required",
+      "scope": "global validated Silver account histories",
+      "result": {
+        "state_changes": 0,
+        "bootstrap": false,
+        "current_table": "lake.silver.risk_alerts",
+        "audit_table": "lake.silver.risk_alert_observations"
+      },
+      "counts_unchanged": {
+        "current_alerts": 0,
+        "observations": 0,
+        "bronze_versions": 228
+      },
+      "provenance": "actual Iceberg main reference snapshot, not newest historical snapshot"
+    }
+  },
+  "fx_live_replay": {
+    "status": "PASS",
+    "rate_date": "2026-01-30",
+    "origin": "LIVE",
+    "observed_at": "2026-11-15T14:27:07.155002+00:00",
+    "same_batch_and_snapshot": true,
+    "version_policy": "content-change-v1",
+    "correction_reversion_and_postcommit_recovery": "PASS in deterministic contract tests; no actual provider restatement fabricated"
+  },
+  "quality": {
+    "ruff": "PASS",
+    "compilation": "PASS",
+    "javascript_syntax": "PASS"
+  },
+  "remaining_boundaries": [
+    "Single-host locks; no multi-host HA or cross-table distributed transaction",
+    "No arbitrary-source CDC/hard deletes or incremental Gold equivalence claim",
+    "Silver/history still retained and scanned; scoped risk computation is not bounded storage",
+    "Shared deployments need trusted TLS/request limiting and backend service identities",
+    "No Azure deployment, native Power BI execution or whole-infrastructure DR acceptance",
+    "Browser visual QA not verified; HTTP/data-contract checks are separate"
+  ]
+}

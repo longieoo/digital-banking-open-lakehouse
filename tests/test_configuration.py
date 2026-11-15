@@ -9,6 +9,7 @@ class ConfigurationTest(unittest.TestCase):
         import yaml
         config=yaml.safe_load(Path('docker-compose.yml').read_text())
         services=config['services']
+        self.assertEqual(services['spark']['image'],services['stream-consumer']['image'])
         for name,service in services.items():
             self.assertTrue(service.get('profiles'), name)
             if 'build' in service:

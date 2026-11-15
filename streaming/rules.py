@@ -1,13 +1,28 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, localcontext
+
+
+def risk_amount(threshold='10000.00'):
+    try:
+        amount = Decimal(threshold)
+    except (InvalidOperation,TypeError) as exc:
+        raise ValueError('Invalid monetary threshold') from exc
+    if not amount.is_finite() or amount <= 0:
+        raise ValueError('Positive finite threshold required')
+    if amount > Decimal('99999999999999999999.99'):
+        raise ValueError('Threshold exceeds DECIMAL(22,2)')
+    with localcontext() as context:
+        context.prec = 32
+        rounded = amount.quantize(Decimal('0.01'))
+    if rounded != amount:
+        raise ValueError('Threshold requires at most two decimal places')
+    return rounded
 
 
 def risk_sql(threshold='10000.00'):
-    amount = Decimal(threshold)
-    if not amount.is_finite() or amount <= 0:
-        raise ValueError('Positive finite threshold required')
+    amount = risk_amount(threshold)
     return f'''
     WITH counts AS (
-      SELECT transaction_id, account_id, event_time, amount, status,
+      SELECT transaction_id, account_id, event_time, amount, status, transaction_type,
         sum(CASE WHEN transaction_type='TRANSFER_OUT' AND status='SUCCESS' THEN 1 ELSE 0 END)
           OVER (PARTITION BY account_id ORDER BY event_time
                 RANGE BETWEEN INTERVAL '5' MINUTE PRECEDING AND CURRENT ROW) AS transfer_count,
@@ -19,7 +34,9 @@ def risk_sql(threshold='10000.00'):
     SELECT transaction_id,account_id,event_time,'AMOUNT' AS rule FROM counts
       WHERE amount > CAST('{amount}' AS DECIMAL(22,2)) AND status='SUCCESS'
     UNION ALL
-    SELECT transaction_id,account_id,event_time,'TRANSFER_VELOCITY' AS rule FROM counts WHERE transfer_count >= 3
+    SELECT transaction_id,account_id,event_time,'TRANSFER_VELOCITY' AS rule FROM counts
+      WHERE transfer_count >= 3 AND transaction_type='TRANSFER_OUT' AND status='SUCCESS'
     UNION ALL
-    SELECT transaction_id,account_id,event_time,'REPEATED_FAILURES' AS rule FROM counts WHERE failure_count >= 3
+    SELECT transaction_id,account_id,event_time,'REPEATED_FAILURES' AS rule FROM counts
+      WHERE failure_count >= 3 AND status='FAILED'
     '''

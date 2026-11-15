@@ -7,7 +7,7 @@ import subprocess
 from time import perf_counter
 import uuid
 
-from bank.release import directory, load, dbt_vars, atomic_json, release_id, code_digest
+from bank.release import directory, load, atomic_json, release_id, code_digest
 
 
 def code_revision(root=None):
@@ -58,8 +58,10 @@ def main():
         return
     run('silver','run','--rm','spark','processing/silver.py','--release-id',value)
     root = f'/opt/bank/runtime/dbt-target/{value}'
-    run('gold','run','--rm','-e',f'DBT_SCHEMA={document["gold_schema"]}','dbt',
-        'build','--profiles-dir','.','--target-path',root,'--vars',json.dumps(dbt_vars(document)))
+    # The release build command owns the same per-release lock as certification.
+    # Calling dbt directly would leave a stale runner able to rebuild certified SQL.
+    run('gold_and_publish','run','--rm','--entrypoint','python','dbt',
+        '-m','bank.release','build','--release-id',value)
     run('publish','run','--rm','--entrypoint','python','bank','-m','bank.release','certify',
         '--release-id',value,'--artifacts',root)
     atomic_json(directory(value)/'timings.json',{'stages':measurements,'code_revision':revision,

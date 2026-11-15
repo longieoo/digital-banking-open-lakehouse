@@ -14,6 +14,18 @@ from scripts import platform
 
 
 class PlatformTest(unittest.TestCase):
+    def test_protected_mode_reads_private_host_file_without_exposing_it_in_command_args(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            token = Path(tmp)/'token'
+            token.write_text('a'*48)
+            with patch.dict(os.environ,{},clear=True),patch('sys.argv',[
+                    'platform','status','--internal','--auth-token-file',str(token)]), \
+                 patch('scripts.platform.subprocess.run') as run:
+                platform.main()
+                self.assertEqual(os.environ['BANK_HTTP_TOKEN'],'a'*48)
+                self.assertIn('docker-compose.auth.yml',os.environ['COMPOSE_FILE'])
+                self.assertNotIn('a'*48,str(run.call_args_list))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -65,11 +77,13 @@ class PlatformTest(unittest.TestCase):
         self.assertIn('airflow-webserver', commands[broker])
         topic = next(i for i, command in enumerate(commands) if 'create' in command and 'bank.transactions' in command)
         dimensions = next(i for i, command in enumerate(commands) if 'processing/silver.py' in command)
+        repair = next(i for i, command in enumerate(commands) if '--reconcile-alerts' in command)
         producer = next(i for i, command in enumerate(commands) if 'streaming.producer' in command)
         consumer = next(i for i, command in enumerate(commands) if 'stream-consumer' in command)
         self.assertLess(broker, topic)
         self.assertLess(topic, dimensions)
-        self.assertLess(dimensions, producer)
+        self.assertLess(dimensions, repair)
+        self.assertLess(repair, producer)
         self.assertLess(producer, consumer)
         self.assertEqual(os.environ['COMPOSE_FILE'], os.pathsep.join([
             'docker-compose.yml', 'docker-compose.ci.yml']))

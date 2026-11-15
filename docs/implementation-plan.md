@@ -194,3 +194,29 @@ Evidence: [full-platform-2026-11-15.json](validation/full-platform-2026-11-15.js
 Detailed logs stay in ignored runtime/completion-2026-11-15. Remote GitHub CI,
 authenticated Azure release, native PBIX/DAX execution and whole-infrastructure DR
 remain distinct unvalidated/unimplemented gates; no production-completion claim.
+
+## Recoverable correction and serving hardening version 0.3
+
+Implemented on 2026-11-15 and finalized on 2026-11-16. This fixes correctness gaps
+without changing the source contract or claiming production HA/CDC.
+
+- Per-release process locks now cover prepare, Silver, dbt build, certification and
+  publication. Exports stage before atomic installation, certified outputs remain
+  immutable, CSV verification parses the hashed bytes and dbt gates require the
+  project's complete model inventory. Trino pagination/redirect routing fails closed.
+- Two real concurrent dbt builds on one prepared release both complete, but only one
+  executes dbt. Both return identical certificates;48 dbt steps and15 exports pass.
+- Current streaming alerts retract on account/status corrections; an immutable audit
+  supports repair after an interrupted commit. Matching-event predicates and policy
+  migration are tested on real Spark, together with producer/checkpoint replay.
+- Same-day provider FX corrections and reversions preserve locally observed versions.
+  Equivalent replay and post-commit recovery reuse identities; rate-date provenance
+  and the forward watermark remain intact. A live HTTP/storage replay also passes.
+- Optional required Bearer authentication protects BI and operational data endpoints.
+  File rotation/expiry, Host/Origin guards, minimal liveness and memory-only browser
+  authentication are tested. Protected HTTP acceptance passes against real exports.
+
+The Windows suite discovers121 tests:115 pass and6 skip. Five infrastructure checks
+pass separately (two PostgreSQL/MinIO/REST and three Spark); the Windows-unavailable
+symlink check is exercised on Linux. Source, runtime and external scope boundaries
+remain explicit in [hardening acceptance](validation/hardening-2026-11-15.json).

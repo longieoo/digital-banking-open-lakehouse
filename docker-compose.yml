@@ -108,6 +108,7 @@ services:
       runtime-init:
         condition: service_completed_successfully
   spark:
+    image: ${COMPOSE_PROJECT_NAME:-digital-banking-open-lakehouse}-spark:local
     build:
       context: .
       dockerfile: docker/spark.Dockerfile
@@ -260,6 +261,7 @@ services:
       retries: 20
     mem_limit: 1g
   stream-consumer:
+    image: ${COMPOSE_PROJECT_NAME:-digital-banking-open-lakehouse}-spark:local
     build:
       context: .
       dockerfile: docker/spark.Dockerfile

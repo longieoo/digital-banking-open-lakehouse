@@ -30,9 +30,11 @@ class ScheduledFxTest(unittest.TestCase):
             self.assertEqual(len(list((root/'raw').rglob('*.json'))),1)
             revised=payload.replace(b'0.886',b'0.887')
             with patch('bank.external.urlopen',return_value=io.BytesIO(revised)):
-                with self.assertRaisesRegex(ValueError,'Source changed'):
-                    ingest_live_fx('2026-01-31',state=state,raw=raw,bronze=bronze)
-            self.assertEqual(state.manifests()[-1]['status'],'FAILED')
+                correction=ingest_live_fx('2026-01-31',state=state,raw=raw,bronze=bronze)
+            self.assertNotEqual(correction['batch_id'],first['batch_id'])
+            with transaction(root/'bronze.db') as db:
+                self.assertEqual(db.execute('SELECT count(*) FROM versions').fetchone()[0],2)
+            self.assertEqual(state.manifests()[-1]['status'],'COMPLETED')
 
     def test_stale_fetch_does_not_write(self):
         payload=b'{"date":"2026-01-20","base":"USD","quote":"EUR","rate":0.886}'

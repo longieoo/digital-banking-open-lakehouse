@@ -59,8 +59,7 @@ jobs:
       - name: Start complete consumption and operating services
         run: sudo --preserve-env=COMPOSE_PROJECT_NAME,COMPOSE_FILE "$(command -v python)" -m scripts.platform up --project "$COMPOSE_PROJECT_NAME" --runtime runtime --internal --all --no-release
       - name: Verify reporting and operational HTTP readiness
-        run: |
-          python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=30); urllib.request.urlopen('http://127.0.0.1:9091/ready', timeout=30)"
+        run: python -m scripts.serving_acceptance
       - name: Collect readable evidence without raw data or credentials
         if: always()
         run: |

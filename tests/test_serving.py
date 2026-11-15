@@ -115,7 +115,7 @@ class ServingTest(unittest.TestCase):
             self.assertEqual(caught.exception.code, expected)
         (self.bundle/'exports/fct_transactions.csv').write_text('corrupt', encoding='utf-8')
         with self.assertRaises(HTTPError) as caught:
-            urlopen(base+'/health')
+            urlopen(base+'/ready')
         self.assertEqual(caught.exception.code, 503)
         self.assertNotIn(str(self.root), caught.exception.read().decode())
 

@@ -8,6 +8,7 @@ from pathlib import Path
 import sqlite3
 
 from bank.observability import metrics, release_metrics
+from bank.http_security import TokenAuth, security_headers
 
 
 class ReadOnlyState:
@@ -45,13 +46,17 @@ def prometheus(result):
     return '\n'.join(lines)+'\n'
 
 
-def handler(control,releases):
+def handler(control,releases,auth=None):
+    auth = auth or TokenAuth.from_env()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):
             pass
 
         def do_GET(self):
-            if self.path=='/health':
+            accepted = auth.request_status(self.headers,protected=self.path!='/health')
+            if accepted!=200:
+                status,content,kind = accepted,b'{"error":"Request rejected"}','application/json'
+            elif self.path=='/health':
                 status,content,kind = 200,b'{"status":"UP"}', 'application/json'
             elif self.path in {'/metrics','/ready','/status'}:
                 result = collect(control,releases)
@@ -65,8 +70,7 @@ def handler(control,releases):
             self.send_response(status)
             self.send_header('Content-Type',kind)
             self.send_header('Content-Length',str(len(content)))
-            self.send_header('Cache-Control','no-store')
-            self.send_header('X-Content-Type-Options','nosniff')
+            security_headers(self,status)
             self.end_headers()
             self.wfile.write(content)
     return Handler
@@ -78,8 +82,13 @@ def main():
     parser.add_argument('--port',type=int,default=9091)
     parser.add_argument('--control',default=os.environ.get('CONTROL_PATH','runtime/control.db'))
     parser.add_argument('--root',default=os.environ.get('RELEASE_ROOT','runtime/releases'))
+    parser.add_argument('--require-auth',action='store_true',help='Fail startup without a valid HTTP token')
     args = parser.parse_args()
-    with ThreadingHTTPServer((args.host,args.port),handler(args.control,args.root)) as server:
+    try:
+        auth = TokenAuth.from_env(require=args.require_auth)
+    except ValueError:
+        parser.error('HTTP authentication configuration is missing, invalid or expired')
+    with ThreadingHTTPServer((args.host,args.port),handler(args.control,args.root,auth)) as server:
         server.serve_forever()
 
 

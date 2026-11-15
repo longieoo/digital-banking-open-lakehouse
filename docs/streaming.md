@@ -15,9 +15,17 @@ batch and stream converge without two different reversal or validation engines.
 
 Rules use real Spark SQL: configurable high amount, three successful outgoing
 transfers in five event-time minutes, and three failures in five minutes. Alert ID
-is transaction/rule; reruns upsert rather than duplicate. Alerts record observations
-and are not automatically retracted when source status changes. This is not fraud
-classification or machine learning.
+is transaction/rule; reruns do not duplicate current alerts. From v0.3,
+`silver.risk_alerts` is current state and retracts alerts invalidated by corrections.
+Immutable ACTIVE/RETRACTED audit observations live separately in
+`silver.risk_alert_observations`. The audit commits first; retry repairs current
+state if interrupted. This is not fraud classification or machine learning.
+
+Normal risk evaluation scopes affected former/current accounts; bootstrap and policy
+changes reconcile globally. A velocity alert belongs only to a qualifying outgoing
+transfer, and a failure alert only to a failed transaction. After an independent
+batch refresh, run `spark streaming/consumer.py --reconcile-alerts`; full-platform
+startup performs this repair automatically. See [hardening](hardening.md).
 
 Late events are retained and recomputed, not dropped. A ten-minute lateness audit
 compares newly observed events to the maximum from prior microbatches. Deduplication lives in Iceberg

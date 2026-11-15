@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from bank.release import directory, release_id, verify
+from bank.http_security import TokenAuth, security_headers
 
 WEB = Path(__file__).parent / 'web'
 ASSETS = {'/': ('index.html', 'text/html'), '/app.js': ('app.js', 'application/javascript'),
@@ -117,7 +118,8 @@ def report(document, tables, currency=None, start=None, end=None):
             'customers': 'Certified as-of snapshot and 30-day window; independent of selected transaction dates.'}}
 
 
-def handler(root):
+def handler(root, auth=None):
+    auth = auth or TokenAuth.from_env()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass  # No query strings, identifiers or client data in access logs.
@@ -128,26 +130,28 @@ def handler(root):
             self.send_response(status)
             self.send_header('Content-Type', content_type + '; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'no-store')
-            self.send_header('X-Content-Type-Options', 'nosniff')
-            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; "
-                             "img-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'")
+            security_headers(self, status)
             self.end_headers()
             self.wfile.write(data)
 
         def do_GET(self):
-            url = urlsplit(self.path)
             try:
+                url = urlsplit(self.path)
+                status = auth.request_status(self.headers, protected=url.path not in ASSETS and url.path != '/health')
+                if status != 200:
+                    return self.respond(status, {'error': 'Authentication required' if status == 401 else 'Request rejected'})
                 if url.path in ASSETS:
                     name, kind = ASSETS[url.path]
                     return self.respond(200, (WEB / name).read_bytes(), kind)
-                if url.path not in {'/health', '/api/report'}:
+                if url.path == '/health':
+                    return self.respond(200, {'status': 'UP'})
+                if url.path not in {'/ready', '/api/report'}:
                     return self.respond(404, {'error': 'Not found'})
                 query = parse_qs(url.query, keep_blank_values=True)
                 if set(query) - {'currency', 'start', 'end'} or any(len(v) != 1 for v in query.values()):
                     return self.respond(400, {'error': 'Invalid filters'})
                 document, tables = snapshot(root)
-                if url.path == '/health':
+                if url.path == '/ready':
                     return self.respond(200, {'status': 'ready', 'release_id': document['release_id'],
                                               'as_of_date': document['as_of_date']})
                 try:
@@ -165,8 +169,13 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=8090)
     parser.add_argument('--root', default=os.environ.get('RELEASE_ROOT', 'runtime/releases'))
+    parser.add_argument('--require-auth', action='store_true', help='Fail startup without a valid HTTP token')
     args = parser.parse_args()
-    server = ThreadingHTTPServer((args.host, args.port), handler(args.root))
+    try:
+        auth = TokenAuth.from_env(require=args.require_auth)
+    except ValueError:
+        parser.error('HTTP authentication configuration is missing, invalid or expired')
+    server = ThreadingHTTPServer((args.host, args.port), handler(args.root, auth))
     print(f'Local synthetic-data dashboard on port {args.port}', flush=True)
     try:
         server.serve_forever()

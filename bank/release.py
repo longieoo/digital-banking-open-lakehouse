@@ -5,16 +5,18 @@ import csv
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import re
 import tempfile
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import uuid
 
 from bank.ingestion import State
+from bank.locking import file_lock
 
 
 def release_id(value):
@@ -31,21 +33,36 @@ def directory(value, root=None):
     return path
 
 
-def atomic_json(path, document):
-    path = Path(path)
-    path.parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=path.parent,delete=False) as handle:
-        temporary = Path(handle.name)
-        json.dump(document,handle,indent=2,sort_keys=True)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(temporary,path)
+def release_lock(value, root=None, timeout=600):
+    """Always acquire before the global publication lock; readers need neither."""
+    folder = directory(value,root)
+    return file_lock(folder.parent/'.release-locks'/f'{release_id(value)}.db',timeout=timeout)
+
+
+def _sync_directory(path):
     if os.name != 'nt':
-        descriptor = os.open(path.parent,os.O_RDONLY)
+        descriptor = os.open(path,os.O_RDONLY)
         try:
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
+
+
+def atomic_json(path, document):
+    path = Path(path)
+    path.parent.mkdir(parents=True,exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=path.parent,delete=False) as handle:
+            temporary = Path(handle.name)
+            json.dump(document,handle,indent=2,sort_keys=True)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary,path)
+        _sync_directory(path.parent)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def code_digest():
@@ -76,6 +93,11 @@ def load(value, root=None):
 
 
 def prepare(value, start_date, as_of_date, currency='USD'):
+    with release_lock(value):
+        return _prepare(value,start_date,as_of_date,currency)
+
+
+def _prepare(value, start_date, as_of_date, currency='USD'):
     from bank.adapters import TABLES, iceberg_catalog
     from bank.pipeline import run_all
     value = release_id(value)
@@ -113,6 +135,13 @@ def dbt_vars(document):
                                          'bronze_schema','silver_schema')}
 
 
+def project_models():
+    models = {path.stem for path in (Path(__file__).resolve().parent.parent/'dbt/models').glob('*.sql')}
+    if not models:
+        raise ValueError('Project model definitions are missing')
+    return models
+
+
 def check_build(document, artifact_root):
     root = Path(artifact_root)
     manifest = json.loads((root/'manifest.json').read_text())
@@ -124,7 +153,10 @@ def check_build(document, artifact_root):
         raise ValueError('Incomplete dbt build')
     if any(row['status'] not in {'success','pass'} for row in actual.values()):
         raise ValueError('Failed or skipped dbt quality gate')
-    models = [node for node in manifest['nodes'].values() if node['resource_type']=='model']
+    models = [node for node in manifest['nodes'].values()
+              if node['resource_type']=='model' and node['package_name']=='banking']
+    if len(models)!=len({node['name'] for node in models}) or {node['name'] for node in models}!=project_models():
+        raise ValueError('Build model inventory does not match the project')
     if any(node['schema'] != document['gold_schema'] for node in models):
         raise ValueError('Build does not belong to this release')
     if results['args'].get('vars') != dbt_vars(document):
@@ -136,17 +168,44 @@ def check_build(document, artifact_root):
     return sorted(node['name'] for node in models)
 
 
+def _http_origin(value):
+    parsed = urlparse(value)
+    if parsed.scheme not in {'http','https'} or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
+        raise ValueError('Invalid Trino HTTP route')
+    try:
+        port = parsed.port
+    except ValueError:
+        raise ValueError('Invalid Trino HTTP port') from None
+    return parsed.scheme,parsed.hostname.lower(),port or (443 if parsed.scheme=='https' else 80)
+
+
+class _TrinoRedirect(HTTPRedirectHandler):
+    def __init__(self, origin):
+        self.origin = origin
+
+    def redirect_request(self, request, fp, code, message, headers, newurl):
+        if _http_origin(newurl)!=self.origin:
+            raise ValueError('Unexpected Trino redirect origin')
+        return super().redirect_request(request,fp,code,message,headers,newurl)
+
+
 class Trino:
     """Local release service client; shared deployments require external authentication."""
     def __init__(self):
         self.base = os.environ.get('TRINO_URL',f'http://{os.environ.get("TRINO_HOST","trino")}:'
                                    f'{os.environ.get("TRINO_PORT","8080")}')
+        self.origin = _http_origin(self.base)
+        parsed = urlparse(self.base)
+        if parsed.path not in {'','/'} or parsed.query:
+            raise ValueError('Trino base must be an origin URL')
+        self.base = self.base.rstrip('/')
+        self._open = build_opener(_TrinoRedirect(self.origin)).open
 
     def pages(self, sql):
         request = Request(self.base+'/v1/statement',data=sql.encode(),headers={
             'X-Trino-User':os.environ.get('TRINO_USER','transformer'),'Content-Type':'text/plain'})
         while True:
-            with urlopen(request,timeout=60) as response:
+            with self._open(request,timeout=60) as response:
                 page = json.loads(response.read(),parse_float=Decimal)
             if 'error' in page:
                 raise RuntimeError('Trino query failed')
@@ -154,7 +213,7 @@ class Trino:
             next_uri = page.get('nextUri')
             if not next_uri:
                 return
-            if urlparse(next_uri).netloc != urlparse(self.base).netloc:
+            if _http_origin(next_uri) != self.origin:
                 raise ValueError('Unexpected Trino next URI')
             request = Request(next_uri,headers={'X-Trino-User':os.environ.get('TRINO_USER','transformer')})
 
@@ -166,6 +225,11 @@ class Trino:
 
 
 def certify(value, artifact_root, client=None):
+    with release_lock(value):
+        return _certify(value,artifact_root,client)
+
+
+def _certify(value, artifact_root, client=None):
     document = load(value)
     if document['status']=='CERTIFIED':
         verify(value)
@@ -181,8 +245,34 @@ def certify(value, artifact_root, client=None):
         raise ValueError('Reconciliation failed')
     if not client.scalar(f'SELECT count(*) FROM lake.{schema}.mart_reconciliation_daily'):
         raise ValueError('No reconciliation evidence')
-    exports = directory(value)/'exports'
-    exports.mkdir(exist_ok=True)
+    folder = directory(value)
+    pointer = folder.parent/'current.json'
+    if pointer.exists() and json.loads(pointer.read_text(encoding='utf-8')).get('release_id')==value:
+        raise ValueError('Uncertified release is already published; prepare a new release')
+    with tempfile.TemporaryDirectory(prefix='.export-build-',dir=folder) as temporary:
+        exports = Path(temporary)
+        files = _export_models(client,schema,models,exports)
+        document.update(status='CERTIFIED',certified_at=datetime.now(timezone.utc).isoformat(),exports=files,
+                        certified_models=models,validation_code_digest=code_digest())
+        _verify_exports(document,export_root=exports)
+        destination = folder/'exports'
+        if destination.is_symlink():
+            raise ValueError('Invalid export directory')
+        # Old pre-certification output can exist after an interrupted legacy run.
+        # Preserve it for diagnosis instead of overwriting files or deleting history.
+        if destination.exists():
+            abandoned = folder/f'.uncertified-exports-{uuid.uuid4().hex}'
+            if destination.resolve().parent!=folder.resolve() or abandoned.resolve().parent!=folder.resolve():
+                raise ValueError('Unsafe export recovery path')
+            os.replace(destination,abandoned)
+        _sync_directory(exports)
+        os.replace(exports,destination)
+        _sync_directory(folder)
+        publish(document)
+    return document
+
+
+def _export_models(client, schema, models, exports):
     files = {}
     for model in models:
         if not re.fullmatch('[a-z][a-z0-9_]*',model):
@@ -208,19 +298,29 @@ def certify(value, artifact_root, client=None):
             for chunk in iter(lambda:handle.read(1024*1024),b''):
                 digest.update(chunk)
         files[model] = dict(rows=count,sha256=digest.hexdigest(),file=f'exports/{model}.csv')
-    document.update(status='CERTIFIED',certified_at=datetime.now(timezone.utc).isoformat(),exports=files,
-                    certified_models=models,
-                    validation_code_digest=code_digest())
-    publish(document)
-    return document
+    return files
 
 
 def publish(document):
     value = release_id(document['release_id'])
+    with release_lock(value):
+        return _publish(document)
+
+
+def _publish(document):
+    value = release_id(document['release_id'])
+    previous_document = load(value)
+    if previous_document['status']=='CERTIFIED' and document!=previous_document:
+        raise ValueError('Certified release manifest is immutable')
+    mutable = {'status','certified_at','exports','certified_models','validation_code_digest'}
+    if any(document.get(key)!=item for key,item in previous_document.items() if key not in mutable):
+        raise ValueError('Release request cannot change during publication')
+    _verify_exports(document)
     # Readers resolve current.json once and consume only immutable certified files.
     state = State(os.environ.get('CONTROL_PATH','runtime/control.db'))
     with state.exclusive():
-        atomic_json(directory(value)/'release.json',document)
+        if previous_document['status']!='CERTIFIED':
+            atomic_json(directory(value)/'release.json',document)
         current = directory(value).parent/'current.json'
         previous = json.loads(current.read_text()) if current.exists() else None
         if previous and (previous['as_of_date'] > document['as_of_date']):
@@ -238,6 +338,27 @@ def publish(document):
 def verify(value, root=None):
     """Verify a certified export after copying it to another machine or restoring it."""
     document = load(value,root)
+    _verify_exports(document,root=root)
+    return document
+
+
+class _DigestReader(io.RawIOBase):
+    """Hash exactly the binary bytes consumed by the CSV parser, in one pass."""
+    def __init__(self, handle, digest):
+        self.handle, self.digest = handle,digest
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        size = self.handle.readinto(buffer)
+        if size:
+            self.digest.update(memoryview(buffer)[:size])
+        return size
+
+
+def _verify_exports(document, root=None, export_root=None):
+    value = release_id(document['release_id'])
     if document['status'] != 'CERTIFIED':
         raise ValueError('Release is not certified')
     if not isinstance(document.get('exports'),dict) or not document['exports']:
@@ -248,30 +369,56 @@ def verify(value, root=None):
     for model,metadata in document['exports'].items():
         if not re.fullmatch('[a-z][a-z0-9_]*',model) or metadata['file'] != f'exports/{model}.csv':
             raise ValueError('Invalid export path')
-        path = directory(value,root)/metadata['file']
-        if path.is_symlink() or path.parent.is_symlink() or path.resolve().parent != (directory(value,root)/'exports').resolve():
+        folder = Path(export_root) if export_root is not None else directory(value,root)/'exports'
+        path = folder/f'{model}.csv'
+        if path.is_symlink() or folder.is_symlink() or path.resolve().parent != folder.resolve():
             raise ValueError('Export path escapes certified bundle')
         if type(metadata.get('rows')) is not int or metadata['rows'] < 0:
             raise ValueError('Invalid export row count')
         digest = hashlib.sha256()
         with path.open('rb') as handle:
-            for chunk in iter(lambda:handle.read(1024*1024),b''):
-                digest.update(chunk)
+            before = os.fstat(handle.fileno())
+            try:
+                with io.TextIOWrapper(io.BufferedReader(_DigestReader(handle,digest)),encoding='utf-8',newline='') as text:
+                    reader = csv.reader(text,strict=True)
+                    header = next(reader,None)
+                    if not header or len(set(header)) != len(header) or any(not name for name in header):
+                        raise ValueError('Invalid certified export header')
+                    count = 0
+                    for row in reader:
+                        if len(row) != len(header):
+                            raise ValueError('Malformed certified export row')
+                        count += 1
+            except (csv.Error,UnicodeError):
+                raise ValueError('Malformed certified export CSV') from None
+            after = os.fstat(handle.fileno())
+            def identity(stat):
+                # Windows fstat/Path.stat disagree on ctime semantics; inode,
+                # size and modification time are comparable on both platforms.
+                return stat.st_dev,stat.st_ino,stat.st_size,stat.st_mtime_ns
+            if identity(before)!=identity(after) or identity(after)!=identity(path.stat()):
+                raise ValueError('Certified export changed during verification')
         if digest.hexdigest()!=metadata['sha256']:
             raise ValueError('Corrupt certified export')
-        with path.open(encoding='utf-8',newline='') as handle:
-            reader = csv.reader(handle)
-            header = next(reader,None)
-            if not header or len(set(header)) != len(header) or any(not name for name in header):
-                raise ValueError('Invalid certified export header')
-            count = 0
-            for row in reader:
-                if len(row) != len(header):
-                    raise ValueError('Malformed certified export row')
-                count += 1
-            if count != metadata['rows']:
-                raise ValueError('Certified export row count mismatch')
-    return document
+        if count != metadata['rows']:
+            raise ValueError('Certified export row count mismatch')
+
+
+def build(value, dbt_executable='dbt'):
+    """One lock covers dbt writes and certification; certified schemas are not rebuilt."""
+    import subprocess
+    with release_lock(value):
+        result = load(value)
+        root = directory(value).parent.parent/'dbt-target'/value
+        if result['status']=='CERTIFIED':
+            return certify(value,root)
+        if result['status']!='SILVER_READY' or result['silver_quality']['rejected']:
+            raise ValueError('Silver quality gate has not passed')
+        subprocess.run([dbt_executable,'build','--project-dir','/opt/bank/dbt',
+            '--profiles-dir','/opt/bank/dbt','--target-path',str(root.resolve()),
+            '--vars',json.dumps(dbt_vars(result))],check=True,
+            env={**os.environ,'DBT_SCHEMA':result['gold_schema']})
+        return certify(value,root)
 
 
 def main():
@@ -288,15 +435,7 @@ def main():
     if args.action=='prepare':
         result = prepare(args.release_id,args.start_date,args.as_of_date,args.currency)
     elif args.action=='build':
-        import subprocess
-        result = load(args.release_id)
-        root = directory(args.release_id).parent.parent/'dbt-target'/args.release_id
-        if result['status']!='CERTIFIED':
-            subprocess.run([args.dbt_executable,'build','--project-dir','/opt/bank/dbt',
-                '--profiles-dir','/opt/bank/dbt','--target-path',str(root.resolve()),
-                '--vars',json.dumps(dbt_vars(result))],check=True,
-                env={**os.environ,'DBT_SCHEMA':result['gold_schema']})
-        result = certify(args.release_id,root)
+        result = build(args.release_id,args.dbt_executable)
     elif args.action=='certify':
         result = certify(args.release_id,args.artifacts)
     elif args.action=='verify':
