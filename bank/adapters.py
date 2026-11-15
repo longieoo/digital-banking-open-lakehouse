@@ -73,6 +73,9 @@ def seed_postgres(data):
                                  for c in updates))
             with db.cursor() as cur:
                 cur.executemany(query, [tuple(row[c] for c in columns) for row in rows])
+        # The initial load provides the baseline. Later committed mutations enter the outbox.
+        from bank.cdc import install
+        install(db)
 
 
 class S3Raw:

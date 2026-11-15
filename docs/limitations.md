@@ -1,5 +1,7 @@
 # Validation boundaries and production extensions
 
+For version 0.4, see [source membership and operations](adr/012-source-membership-and-incremental-reporting.md). The items below describe the preceding 0.3 architecture and historical acceptance.
+
 See [full operation](full-platform.md) and [completion evidence](validation/full-platform-2026-11-15.json).
 Historical validation JSON files retain their original dates.
 

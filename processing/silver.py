@@ -147,10 +147,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--release-id')
+    parser.add_argument('--full-refresh', action='store_true')
     args = parser.parse_args()
     spark = session()
     if args.release_id:
-        release(spark,args.release_id)
+        release(spark,args.release_id,args.full_refresh)
         spark.stop()
         return
     for namespace in ['silver','quarantine']:
@@ -160,14 +161,16 @@ def main():
     spark.stop()
 
 
-def release(spark, value):
+def release(spark, value, full_refresh=False):
     from bank.release import release_lock
     with release_lock(value):
-        return _release_locked(spark,value)
+        return _release_locked(spark,value,full_refresh)
 
 
-def _release_locked(spark, value):
-    from bank.release import load, directory, atomic_json
+def _release_locked(spark, value, full_refresh=False):
+    from bank.release import load, directory, atomic_json, code_digest
+    from bank.membership import verify_membership
+    import json
     from bank.pipeline import DATED_TABLES, RELATED_TABLES
     from bank.ingestion import utc
     from pyspark.sql import functions as F
@@ -178,25 +181,65 @@ def _release_locked(spark, value):
     quarantine = f'quarantine_r_{document["release_id"]}'
     for namespace in (bronze,silver,quarantine):
         spark.sql(f'CREATE NAMESPACE IF NOT EXISTS lake.{namespace}')
+    membership = document['source_cutoff'].get('membership')
+    policy = code_digest()
+    baseline = {}
+    pointer = directory(value).parent / 'current.json'
+    if membership is not None and not full_refresh and pointer.exists():
+        previous = load(json.loads(pointer.read_text())['release_id'])
+        if previous['status'] == 'CERTIFIED' and previous.get('silver_code_digest') == policy:
+            baseline = previous
     frames = {}
     for table,snapshot in document['bronze_snapshots'].items():
         reader = spark.read.format('iceberg')
         frame = reader.option('snapshot-id',str(snapshot)).load(f'lake.bronze.{table}') if snapshot else (
             reader.load(f'lake.bronze.{table}').limit(0))
-        if table in DATED_TABLES:
+        if membership is not None:
+            path = directory(value) / 'source-membership' / f'{table}.jsonl'
+            verify_membership(path, membership[table])
+            keys = spark.read.schema('record_id string, source_updated_at string').json(path.resolve().as_uri())
+            frame = frame.join(keys, ['record_id', 'source_updated_at'], 'left_semi')
+        elif table in DATED_TABLES:
             frame = frame.filter(f"business_date BETWEEN '{document['start_date']}' AND '{document['as_of_date']}'")
         if table=='source_totals':
             frame = frame.filter(F.col('source_updated_at')==utc(document['source_cutoff']['captured_at']))
         frames[table] = frame
     for table,frame in frames.items():
-        if table in RELATED_TABLES:
+        if membership is None and table in RELATED_TABLES:
             child_key,parent,parent_key = RELATED_TABLES[table]
             parent_column = F.col('record_id') if parent_key=='record_id' else F.get_json_object('payload',f'$.{parent_key}')
             included = frames[parent].select(parent_column.alias('_included')).distinct()
             frame = frame.join(included,F.get_json_object(frame.payload,f'$.{child_key}')==included._included,'left_semi')
         # Isolate both SQL engines from ongoing batch and streaming writes.
         frame.writeTo(f'lake.{bronze}.{table}').using('iceberg').createOrReplace()
-    measurements = [process_table(spark,table,bronze,silver,quarantine,strict=True) for table in TABLES]
+        if membership is not None:
+            counts = spark.table(f'lake.{bronze}.{table}').agg(
+                F.count('*').alias('total'),
+                F.countDistinct('record_id', 'source_updated_at').alias('identities')).first()
+            if counts.total != membership[table]['count'] or counts.identities != counts.total:
+                raise ValueError(f'Pinned Bronze membership mismatch in {table}')
+    measurements = []
+    reused = set()
+    snapshots = {}
+    prior_counts = {row['table']: row for row in baseline.get('silver_quality', {}).get('tables', [])}
+    for table in TABLES:
+        target = f'lake.{silver}.{table}'
+        snapshot = baseline.get('silver_snapshots', {}).get(table)
+        dependencies = {parent for _, parent, _ in REFERENCES.get(table, [])}
+        if (snapshot and dependencies <= reused and membership[table] ==
+                baseline['source_cutoff']['membership'][table]):
+            source = f"lake.{baseline['silver_schema']}.{table}"
+            rows = spark.read.format('iceberg').option('snapshot-id', str(snapshot)).load(source)
+            rows.writeTo(target).using('iceberg').tableProperty('format-version','2').createOrReplace()
+            measurements.append(dict(prior_counts[table], mode='reuse'))
+            reused.add(table)
+        else:
+            result = process_table(spark, table, bronze, silver, quarantine, strict=True)
+            measurements.append(dict(result, mode='transform'))
+        main_ref = spark.sql(f"SELECT snapshot_id FROM {target}.refs WHERE name = 'main'").first()
+        snapshots[table] = main_ref.snapshot_id if main_ref else None
+    document.update(silver_snapshots=snapshots, silver_code_digest=policy,
+                    silver_baseline=baseline.get('release_id'))
     document.update(status='SILVER_READY',silver_quality={'rejected':sum(r['rejected'] for r in measurements),
                                                        'tables':measurements})
     atomic_json(directory(value)/'release.json',document)

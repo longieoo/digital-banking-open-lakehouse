@@ -31,6 +31,7 @@ def main():
     parser.add_argument('--start-date',default='2026-01-01')
     parser.add_argument('--as-of-date',default='2026-01-31')
     parser.add_argument('--currency',default='USD')
+    parser.add_argument('--full-refresh', action='store_true')
     args = parser.parse_args()
     os.environ.setdefault('RELEASE_ROOT',str(Path(os.environ.get('BANK_RUNTIME_DIR','runtime'))/'releases'))
     value = release_id(args.release_id)
@@ -56,7 +57,8 @@ def main():
             '--release-id',value,'--artifacts',f'/opt/bank/runtime/dbt-target/{value}')
         print(json.dumps({'release_id':value,'status':'CERTIFIED','reused':True}))
         return
-    run('silver','run','--rm','spark','processing/silver.py','--release-id',value)
+    run('silver','run','--rm','spark','processing/silver.py','--release-id',value,
+        *(['--full-refresh'] if args.full_refresh else []))
     root = f'/opt/bank/runtime/dbt-target/{value}'
     # The release build command owns the same per-release lock as certification.
     # Calling dbt directly would leave a stale runner able to rebuild certified SQL.

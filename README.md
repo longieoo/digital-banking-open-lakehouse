@@ -53,6 +53,8 @@ restatement observations, and offers protected dashboard/metrics access. See the
 The [architecture guide](docs/architecture.md), [release contract](docs/releases.md)
 and [ADRs](docs/adr/010-full-local-operation.md) explain the implementation and tradeoffs.
 
+Version 0.4 pins PostgreSQL row membership for each release, reuses unchanged Silver tables and updates affected days in the daily transaction mart. The [release and recovery guide](docs/adr/012-source-membership-and-incremental-reporting.md) covers correction handling, change capture, benchmarking and restore commands.
+
 ## Data products
 
 | Product | What it answers |
@@ -155,9 +157,10 @@ does not publish it automatically. The retention planner never deletes Iceberg h
 ## Scope and next work
 
 This is a working educational platform, not a production banking deployment.
-Current limits include single-host coordination, full Silver/Gold rebuilds, retained
-stream-history scans and simplified accounting assumptions. General CDC/deletes,
-incremental correction handling and distributed HA need further design and evidence.
+Current limits include single-host coordination, full processing of changed Silver
+tables and most Gold models, retained streaming history and simplified accounting.
+Source DML capture is opt-in on existing databases. Distributed HA and cloud
+acceptance require a separate deployment.
 
 Azure deployment and ADLS identity checks require configured infrastructure;
 Terraform validation alone does not prove them. A runnable web dashboard is included,

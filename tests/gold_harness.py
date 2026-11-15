@@ -35,7 +35,7 @@ class GoldHarness:
         import sqlglot
         sql = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(Path(path).read_text()).render(
             ref=lambda name: f'gold.{name}', source=lambda schema,name: f'{schema}.{name}',
-            var=lambda name: self.variables[name])
+            var=lambda name, *default: self.variables.get(name, *default))
         return sqlglot.transpile(sql, read='trino', write='duckdb')[0]
 
     def build(self):

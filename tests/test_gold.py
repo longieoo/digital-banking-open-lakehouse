@@ -13,6 +13,21 @@ class GoldTest(unittest.TestCase):
         self.addCleanup(self.h.close)
         self.h.build()
 
+    def test_daily_incremental_matches_full_after_delete_and_move(self):
+        db = self.h.db
+        db.execute("ATTACH ':memory:' AS lake")
+        db.execute('CREATE SCHEMA lake.prior')
+        for model in ('fct_transactions','mart_transaction_daily'):
+            db.execute(f'CREATE TABLE lake.prior.{model} AS SELECT * FROM gold.{model}')
+        db.execute("DELETE FROM gold.fct_transactions WHERE business_date = (SELECT min(business_date) FROM gold.fct_transactions)")
+        db.execute("UPDATE gold.fct_transactions SET business_date = DATE '2026-02-01' WHERE status = 'FAILED'")
+        path = Path('dbt/models/mart_transaction_daily.sql')
+        db.execute('CREATE TABLE expected AS ' + self.h.render(path))
+        self.h.variables['baseline_schema'] = 'prior'
+        db.execute('CREATE TABLE observed AS ' + self.h.render(path))
+        for a, b in [('expected','observed'),('observed','expected')]:
+            self.assertEqual(db.execute(f'SELECT * FROM {a} EXCEPT ALL SELECT * FROM {b}').fetchall(), [])
+
     def test_scd_history_and_historical_join(self):
         self.assertGreater(self.h.scalar('SELECT count(*) FROM gold.dim_customer'), 8)
         self.assertEqual(self.h.scalar('SELECT count(*) FROM gold.dim_customer WHERE is_current'), 8)

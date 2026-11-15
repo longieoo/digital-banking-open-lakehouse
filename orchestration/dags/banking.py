@@ -94,3 +94,25 @@ with DAG('bank_release',start_date=datetime(2026,1,1,tzinfo=timezone.utc),schedu
         'python -m bank.release build --dbt-executable /opt/bank/dbt-venv/bin/dbt --release-id '
         '"{{ ti.xcom_pull(task_ids=\'prepare_snapshot\') }}"')
     fx_task >> prepare_task >> silver_task >> publish_task
+
+
+def archive_postgres_changes():
+    import psycopg
+    from bank.cdc import drain
+    from bank.adapters import raw_store
+    store = raw_store()
+    with psycopg.connect(autocommit=True, connect_timeout=10) as db:
+        total = 0
+        # Bound each task's work. A later scheduled run drains the remaining backlog.
+        for _ in range(20):
+            count = drain(db, store, 500)
+            total += count
+            if count < 500:
+                break
+        return total
+
+
+with DAG('bank_cdc_archive', start_date=datetime(2026,1,1,tzinfo=timezone.utc),
+         schedule='*/15 * * * *', catchup=False, max_active_runs=1,
+         default_args=DEFAULTS, tags=['banking','cdc']) as cdc_dag:
+    PythonOperator(task_id='archive_committed_changes', python_callable=archive_postgres_changes)

@@ -220,3 +220,10 @@ The Windows suite discovers121 tests:115 pass and6 skip. Five infrastructure che
 pass separately (two PostgreSQL/MinIO/REST and three Spark); the Windows-unavailable
 symlink check is exercised on Linux. Source, runtime and external scope boundaries
 remain explicit in [hardening acceptance](validation/hardening-2026-11-15.json).
+
+## Version 0.4 — source corrections and operations
+
+ADR 012 specifies the PostgreSQL row membership contract, transactional change archive,
+table-level Silver reuse, day-level Gold corrections, full rebuild comparison,
+end-to-end benchmark, cold volume recovery, compaction and browser acceptance.
+Azure deployment and native Power BI execution require an available target environment.

@@ -1,4 +1,8 @@
-# Full implementation report version 0.3
+# Implementation report
+
+Version 0.4 extends the baseline below with exact source membership, incremental reporting, transactional change capture and recovery drills. See [ADR 012](adr/012-source-membership-and-incremental-reporting.md).
+
+## Version 0.3 baseline
 
 The educational banking platform implements PostgreSQL/file/API → Python/Airflow
 → raw → Iceberg Bronze → Spark Silver → Trino/dbt Gold → certified BI consumption,

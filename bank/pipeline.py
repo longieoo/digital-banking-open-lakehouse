@@ -1,4 +1,6 @@
 """Bounded metadata-driven runner after explicit source adapters are established."""
+from contextlib import ExitStack
+from bank.membership import Membership
 from datetime import date, datetime, timezone
 import json
 import os
@@ -34,7 +36,7 @@ def refresh_controls():
           source_amount=excluded.source_amount,updated_at=excluded.updated_at''')
 
 
-def run_all(config_path='config/ingestion.json', dates=None, state=None, snapshot_info=None):
+def run_all(config_path='config/ingestion.json', dates=None, state=None, snapshot_info=None, membership_root=None):
     if dates:
         dates = tuple(date.fromisoformat(d).isoformat() for d in dates)
     config = load_config(config_path)
@@ -43,7 +45,7 @@ def run_all(config_path='config/ingestion.json', dates=None, state=None, snapsho
     state = state or State(os.environ.get('CONTROL_PATH','runtime/control.db'))
     results = []
     # One read snapshot for every page and table; cooperating stream writers wait.
-    with state.exclusive(), psycopg.connect(connect_timeout=10) as connection:
+    with ExitStack() as files, state.exclusive(), psycopg.connect(connect_timeout=10) as connection:
         connection.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
         snapshot, captured_at = connection.execute('SELECT pg_current_snapshot()::text, clock_timestamp()').fetchone()
         if snapshot_info is not None:
@@ -51,6 +53,9 @@ def run_all(config_path='config/ingestion.json', dates=None, state=None, snapsho
             minimum = connection.execute('SELECT min(business_date) FROM core.transactions').fetchone()[0]
             if dates and minimum and dates[0] > minimum.isoformat():
                 raise ValueError('Zero-opening releases must include the complete ledger history')
+        if membership_root is not None:
+            membership_root.mkdir(parents=True, exist_ok=True)
+            snapshot_info['membership'] = {}
         for item in config:
             if not item['enabled']:
                 continue
@@ -61,7 +66,11 @@ def run_all(config_path='config/ingestion.json', dates=None, state=None, snapsho
             bronze = IcebergBronze(catalog,table)
             if dates:
                 # Related facts and all dimensions are replayed together, in pages.
-                source = PagedBackfill(source, dates if table in DATED_TABLES or table in RELATED_TABLES else None)
+                writer = None
+                if membership_root is not None:
+                    handle = files.enter_context((membership_root / f'{table}.jsonl').open('wb'))
+                    writer = Membership(handle, TABLES[table][1])
+                source = PagedBackfill(source, dates if table in DATED_TABLES or table in RELATED_TABLES else None, writer)
             while True:
                 result = ingest(source,raw,bronze,state,source_name=f'{TABLES[table][0]}.{table}',
                                 key=TABLES[table][1],dates=dates,limit=item['batch_size'],
@@ -73,6 +82,8 @@ def run_all(config_path='config/ingestion.json', dates=None, state=None, snapsho
                 results.append(result)
                 if result['count'] < item['batch_size']:
                     break
+            if dates and membership_root is not None:
+                snapshot_info['membership'][table] = writer.metadata()
     return results
 
 
@@ -86,7 +97,8 @@ RELATED_TABLES = {
 
 class PagedBackfill:
     """Keyset pagination without changing durable forward watermarks."""
-    def __init__(self, source, dates):
+    def __init__(self, source, dates, writer=None):
+        self.writer = writer
         from bank.ingestion import MemorySource
         if isinstance(source, MemorySource) and dates:
             source = MemorySource([r for r in source.rows if dates[0] <= r['business_date'] <= dates[1]],
@@ -124,6 +136,8 @@ class PagedBackfill:
             if self.dates:
                 rows = [r for r in rows if self.dates[0] <= r['business_date'] <= self.dates[1]]
         # Advance only when ingest returns, so a failed call keeps the same page.
+        if self.writer is not None:
+            self.writer.record(rows)
         return rows
 
     def advance(self, result):

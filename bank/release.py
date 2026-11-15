@@ -114,7 +114,8 @@ def _prepare(value, start_date, as_of_date, currency='USD'):
                 raise ValueError('Release ID already belongs to another request')
             return existing
         info = {}
-        results = run_all(dates=(start.isoformat(),end.isoformat()),state=state,snapshot_info=info)
+        results = run_all(dates=(start.isoformat(),end.isoformat()),state=state,snapshot_info=info,
+                          membership_root=path.parent/'source-membership')
         catalog = iceberg_catalog()
         snapshots = {}
         for table in TABLES:
@@ -131,8 +132,11 @@ def _prepare(value, start_date, as_of_date, currency='USD'):
 
 
 def dbt_vars(document):
-    return {key:document[key] for key in ('start_date','as_of_date','reporting_currency',
+    variables = {key:document[key] for key in ('start_date','as_of_date','reporting_currency',
                                          'bronze_schema','silver_schema')}
+    if document.get('gold_baseline'):
+        variables['baseline_schema'] = 'gold_r_' + release_id(document['gold_baseline'])
+    return variables
 
 
 def project_models():
@@ -414,6 +418,13 @@ def build(value, dbt_executable='dbt'):
             return certify(value,root)
         if result['status']!='SILVER_READY' or result['silver_quality']['rejected']:
             raise ValueError('Silver quality gate has not passed')
+        baseline_id = result.get('silver_baseline')
+        if baseline_id:
+            prior = load(baseline_id)
+            compatible = all(prior[key] == result[key] for key in ('start_date','as_of_date','reporting_currency'))
+            if compatible and prior['status'] == 'CERTIFIED' and prior['validation_code_digest'] == code_digest():
+                result['gold_baseline'] = baseline_id
+                atomic_json(directory(value)/'release.json',result)
         subprocess.run([dbt_executable,'build','--project-dir','/opt/bank/dbt',
             '--profiles-dir','/opt/bank/dbt','--target-path',str(root.resolve()),
             '--vars',json.dumps(dbt_vars(result))],check=True,

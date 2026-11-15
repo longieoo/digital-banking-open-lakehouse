@@ -2,6 +2,8 @@ name: quality
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '17 3 * * 1'
   workflow_dispatch:
     inputs:
       distributed:
@@ -29,6 +31,23 @@ jobs:
       - run: python scripts/check_repository.py
       - run: cp .env.example .env && docker compose --profile '*' config --quiet
       - run: python -m pip wheel --no-deps --wheel-dir runtime/wheels .
+  storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: banking-storage-ci
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python scripts/create_demo_env.py
+      - run: docker compose up -d --wait postgres catalog
+      - run: docker compose build bank
+      - run: docker compose run --rm -e RUN_STACK=1 --entrypoint python bank -m unittest -v tests.integration.test_stack tests.integration.test_cdc
+      - if: always()
+        run: docker compose --profile '*' down --volumes
   terraform:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +59,7 @@ jobs:
       - run: terraform -chdir=infra/terraform init -backend=false -input=false
       - run: terraform -chdir=infra/terraform validate
   distributed-release:
-    if: github.event_name == 'workflow_dispatch' && inputs.distributed
+    if: (github.event_name == 'workflow_dispatch' && inputs.distributed) || (github.event_name == 'schedule' && vars.BANK_DISTRIBUTED_CI == 'true')
     runs-on: [self-hosted, linux, bank-lakehouse]
     timeout-minutes: 90
     env:
@@ -60,6 +79,8 @@ jobs:
         run: sudo --preserve-env=COMPOSE_PROJECT_NAME,COMPOSE_FILE "$(command -v python)" -m scripts.platform up --project "$COMPOSE_PROJECT_NAME" --runtime runtime --internal --all --no-release
       - name: Verify reporting and operational HTTP readiness
         run: python -m scripts.serving_acceptance
+      - name: Verify transactional capture and retry
+        run: docker compose run --rm -e RUN_STACK=1 --entrypoint python bank -m unittest tests.integration.test_cdc
       - name: Collect readable evidence without raw data or credentials
         if: always()
         run: |
