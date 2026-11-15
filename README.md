@@ -1,154 +1,160 @@
-# Digital Banking Open Lakehouse Platform
+# Digital Banking Open Lakehouse
 
-A **production-style educational banking data platform** built around recoverable ingestion and explainable financial data products. All customers, accounts, cards and transactions are synthetic. This is a portfolio project, not a production banking system.
+A banking data pipeline built to keep financial reports correct when a job fails,
+events are replayed, or a historical reporting period needs to be rebuilt.
 
-The central question: **can a pipeline fail, retry and backfill without losing or double-counting financial events—and can we prove agreement with the ledger?**
-
-## Complete local platform version 0.2
-
-The full source includes a certified-data web dashboard, HTTP health/Prometheus
-metrics, scheduled/retryable LIVE FX, verified product backup/restore, lifecycle
-inventory and Azure readiness/probe tools. No batch, streaming, tests, Terraform,
-DAX or coursework modules have been removed.
-
-Start with [the full operation guide](docs/full-platform.md). After installing
-requirements-test.txt, run `python -m scripts.platform up --internal --all --seed`
-on a dedicated demo project. Explicit `--seed` replaces its synthetic source;
-omit it to preserve existing data. BI: `http://127.0.0.1:8090`;
-metrics: `http://127.0.0.1:9091/metrics`. Concurrent operation benefits from16GB+
-Docker memory; acceptance can run in stages on smaller hosts.
-
-[Current summary](docs/final-report.md) ·
-[Completion evidence](docs/validation/full-platform-2026-11-15.json) ·
-[Azure acceptance](docs/azure-acceptance.md)
-
-## Validation at a glance
-
-- **PASS:** source invariants; ingestion recovery/backfill; real local Iceberg snapshots, time travel, schema evolution and reopen; actual Gold SQL business tests; reconciliation mismatch detection; dbt parsing; lint; Terraform init/fmt/validate.
-- **PASS (local Docker, 2026-09-16/17):** PostgreSQL/MinIO/REST recovery and backfill; Spark Silver and risk SQL; Trino/dbt (14 models + 31 data tests); streaming replay/checkpoint restart; Airflow Bronze → Silver → Gold; catalog/storage restart persistence.
-- **PASS (DE upgrade, 2026-10-07):** 45 local tests plus four real infrastructure tests; certified two-date releases, retry/failure publication protection; live dbt 15 models + 33 tests; Airflow bank_release execution and 100K/1M Spark join benchmarks. See [release runbook](docs/releases.md).
-- **UNAVAILABLE:** Azure deployment and Power BI Desktop artifact validation.
-- **Explicit substitute:** Gold unit tests run actual dbt SQL through DuckDB translation against typed fixture Silver. Distributed acceptance is recorded separately. Frankfurter v2 live extraction/ingestion passed on 2026-10-05; offline fixtures remain explicitly labeled.
-
-See the [validation ledger](docs/implementation-plan.md), [test boundaries](docs/testing.md) and [known limitations](docs/limitations.md). Code existence is not runtime validation. Fresh-clone local tests pass; a fresh
-Terraform initialization previously hit a local file-access error; a Linux-container
-recheck now passes init/fmt/validate. Historical reports retain their original results.
+The project brings account, card and general-ledger data into an Iceberg lakehouse,
+then publishes a verified reporting bundle. The focus is on recoverable ingestion,
+clear data models and reconciliation that can explain where a number came from.
+All customers, accounts and transactions are synthetic.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  Source[Core / Card / GL PostgreSQL] --> Airflow[Airflow + Python]
-  Airflow --> Raw[Raw landing] --> Bronze[Bronze Iceberg]
-  Bronze --> Spark[Spark] --> Silver[Silver Iceberg]
-  Silver --> Trino[Trino + dbt] --> Gold[Gold Iceberg] --> BI[BI serving]
-  Events[Synthetic events] --> Kafka[Redpanda] --> Stream[Structured Streaming]
-  Stream --> Bronze
-  Stream --> Risk[Rule alerts]
-  Bronze & Silver & Gold -. objects .-> Store[MinIO locally / ADLS in Azure]
+    PG[PostgreSQL core / card / GL] --> ING[Python + Airflow]
+    API[Reference FX API] --> ING
+    ING --> RAW[Raw landing]
+    RAW --> BR[Iceberg Bronze]
+    BR --> SP[Spark conformance]
+    SP --> SI[Iceberg Silver]
+    SI --> DBT[Trino + dbt]
+    DBT --> GO[Gold models + tests]
+    GO --> CERT[Certified export bundle]
+    CERT --> BI[Read-only dashboard]
+    EV[Synthetic events] --> RP[Redpanda]
+    RP --> SS[Spark Structured Streaming]
+    SS --> BR
+    SS --> RISK[Rule observations]
 ```
 
-| Technology | Distinct responsibility |
-|---|---|
-| PostgreSQL | Operational keys, FKs, constraints and exact NUMERIC money |
-| Python | Generation, extraction, validation and durable control state |
-| Airflow | Scheduling, retry, backfill and Dataset dependencies |
-| MinIO / ADLS | Environment-specific object storage |
-| Iceberg v2 / REST | Atomic table state, schemas, snapshots and metadata |
-| Spark / PySpark | Bronze-to-Silver typing, references, dedup and quarantine |
-| Trino | Interactive SQL over the same Iceberg files |
-| dbt | Silver-to-Gold dimensions, facts, marts and SQL assertions |
-| Redpanda / Structured Streaming | Replayable events, shared conformance and rule monitoring |
-| Terraform | Azure storage, RBAC, restricted networking and Key Vault |
-| Docker / GitHub Actions | Service profiles and validation automation |
-| Power BI | Analytical consumption specification; no fabricated PBIX |
+MinIO stores local objects. Iceberg manages table metadata and snapshots; Spark
+handles conformance; dbt owns analytical transformations. ADLS and Terraform provide
+the cloud storage path, with deployment and identity acceptance documented separately.
 
-[Full architecture and grains](docs/architecture.md) · [Architectural decisions](docs/adr/001-boundaries.md)
+## Design decisions
 
-## Business capabilities
+- **Recover before advancing.** A watermark moves only after raw and Bronze writes
+  have been verified. A retry recognizes versions already committed.
+- **Read a consistent source.** A release captures source tables and control totals
+  in one PostgreSQL read transaction, then pins the Iceberg inputs used downstream.
+- **Model the financial grain.** Transactions are posting events; transfers have a
+  separate fact to count each transfer once. Failed transactions do not move balances.
+  Customer SCD2 joins use event time rather than today's customer attributes.
+- **Publish after checking.** Silver validation, dbt tests and source/Gold/GL
+  reconciliation must pass before a release replaces the current reporting bundle.
+  A failed build leaves the previous certified output available.
 
-| Product | Behavior |
-|---|---|
-| Customer 360 | Account/card counts, balance, 30-day activity, spend and failure metrics |
-| Transactions | Date, status, channel, type, branch and historical customer segment |
-| Daily balances | Dense account/date snapshots: opening + credit − debit = closing |
-| Branch/card analytics | Purchase value and failures without doubling core balance effects |
-| Reconciliation | Source/Bronze/Gold counts, monetary totals and per-posting Core/GL agreement |
-| Rule monitoring | High amount, transfer velocity and repeated failures; no ML |
+The [architecture guide](docs/architecture.md), [release contract](docs/releases.md)
+and [ADRs](docs/adr/010-full-local-operation.md) explain the implementation and tradeoffs.
 
-Customer SCD2 tracks segment/branch/status with half-open intervals. Transfers have two core legs but one transfer fact. Reversals are opposite postings linked to originals. Failed events do not affect balances. The demo uses USD, zero opening balances and exact decimal amounts. [Source semantics](docs/source-model.md) · [Gold SQL](dbt/models)
+## Data products
 
-## Local correctness demo
+| Product | What it answers |
+| --- | --- |
+| Transaction reporting | Activity by date, channel, status, type, branch and historical customer segment |
+| Daily account balances | Opening balance + credits − debits = closing balance, including inactive days |
+| Customer 360 | Account/card holdings, balance and a defined 30-day activity window |
+| Branch and card reporting | Successful card spend and failures without duplicating balance effects |
+| Reconciliation | Agreement between source, Bronze, Gold and per-posting ledger entries |
+| Rule monitoring | High-value transactions, transfer velocity and repeated failures |
+
+Gold contains **7 dimensions, 4 facts and 4 marts**. Monetary values use exact
+Decimal/NUMERIC types and retain their currency. Balances are measured at a date,
+not added across dates. LIVE FX is reference data; it does not silently convert Gold.
+
+## Run locally
+
+Use Python 3.11+, Docker with Linux containers, and network access for dependencies.
+Allow roughly 16 GB of Docker memory for concurrent operation. Smaller hosts can
+run the acceptance checks in stages, as documented in the full operation guide.
 
 ```sh
 python -m venv .venv
-# Activate the environment, then:
+# Activate: .venv\Scripts\Activate.ps1 on Windows, or source .venv/bin/activate on Linux/macOS.
 python -m pip install -r requirements-test.txt
-python -m unittest discover -s tests -v
-python -m scripts.local_demo
+python -m scripts.platform up --internal --all --seed
 ```
 
-The measured small demo produces 113 source/real-Iceberg/Gold events, eight Customer 360 rows, 248 daily balances and zero reconciliation failures. Its typed Silver substitute is prominently labeled. Runtime files stay under ignored runtime/.
+`--seed` explicitly prepares the selected demo database with synthetic data. Omit it
+to preserve an existing source. The command creates `.env` only when it is missing,
+builds a certified release, then starts BI, monitoring, Airflow and the event branch.
+Use a separate `--project` and `--runtime` for another demo environment.
 
-## Distributed platform
+| Service | Local address |
+| --- | --- |
+| Dashboard | http://127.0.0.1:8090 |
+| Operational status | http://127.0.0.1:9091/status |
+| Prometheus metrics | http://127.0.0.1:9091/metrics |
+| Airflow | http://127.0.0.1:8081 |
 
-The upgraded reporting path is a [certified data release](docs/releases.md): one
-PostgreSQL read snapshot, pinned Iceberg inputs, explicit business dates, strict
-Silver/dbt/reconciliation gates and atomic publication of a hashed BI export bundle.
-`python -m scripts.run_release` runs it after services/images and synthetic sources
-are ready. `bank_release` is its primary daily Airflow DAG. The commands below remain
-the manual compatibility path; their Gold tables are not a certified export release.
-
-Requires Docker Compose v2, Linux containers, image/Maven access and approximately 16 GB available RAM for a staged demo. Start named services as needed.
+Airflow credentials are in the generated local `.env`. New schedules stay paused;
+add `--enable-schedules` to `up --all` when daily release and FX execution are wanted.
+If ports are occupied, use the alternatives in [full-platform.md](docs/full-platform.md).
 
 ```sh
-python scripts/create_demo_env.py
-# Also creates a writable runtime directory for the container demo.
-docker compose --profile core --profile lakehouse up -d --wait postgres catalog
-docker compose build bank spark dbt
-docker compose run --rm bank seed --profile small
-docker compose run --rm --entrypoint python bank -m bank.pipeline
-docker compose --profile processing run --rm spark
-docker compose --profile query up -d --wait trino
-docker compose run --rm dbt build --profiles-dir .
+python -m scripts.platform status --internal
+python -m scripts.platform stop --internal
 ```
 
-The [full runbook](docs/demo.md) covers clean clone, profiles, failure/retry, backfill, snapshots, streaming and Airflow. `python scripts/e2e.py` is the opt-in real-stack acceptance gate, including Gold writes after catalog restart.
+Stopping preserves volumes, releases and checkpoints. The dashboard reads certified
+exports only; its four pages cover overview, Customer 360, transactions and reconciliation.
 
-## Reliability and quality
+## Verification
 
-The cursor is `(updated_at, transaction_id)`. Required order: extract → immutable raw write/read-back → Bronze commit/read-back → completed manifest and atomic forward-watermark update. Immutable source-version identities make reruns safe. Backfills leave forward state unchanged. Tests inject failures before and after target commit.
+```sh
+python -m unittest discover -s tests -v
+ruff check .
+```
 
-Bad types, references, currency, amount or reversal links go to quarantine. dbt checks grains, SCD intervals, card/core agreement, transfer legs, balance continuity and reconciliation. Even a balanced but misallocated journal produces FAIL. [Recovery design](docs/adr/002-ingestion-state.md) · [Reconciliation](docs/reconciliation.md)
+The recorded Windows run discovers **96 tests: 91 pass and 5 skip**. The four
+infrastructure tests pass separately against PostgreSQL/MinIO/REST and Spark;
+the symlink test unavailable on Windows passes on Linux. These scopes are kept
+separate from the local test result.
 
-## Storage, Spark and performance
+The real Docker acceptance produced the following January 31, 2026 fixture:
 
-Raw retains canonical batches; Bronze is source-aligned Iceberg; Silver is typed/conformed; Gold contains dimensional products. Iceberg uses compressed Parquet, daily transaction partitions, snapshots and MERGE. It supplies table-state management, not universal speed improvements.
+| Result | Value |
+| --- | ---: |
+| Core transaction events | 225 |
+| Customer 360 rows | 20 |
+| Daily balance rows | 620 |
+| Passing reconciliation groups | 30 |
+| Certified CSV exports with hashes | 15 |
 
-[Measured local Iceberg/Parquet results](docs/performance/iceberg-vs-unmanaged-parquet.md) are small single-process samples. [Spark/JDBC experiments](docs/performance/spark.md) cover volumes, partitions and join hints but remain unmeasured without that runtime. Full Silver/Gold scans and stream-history recomputation are deliberate scale limitations.
+Trino/dbt completes **15 models and 33 tests**. Acceptance also covers release retry,
+historical publication protection, rejection of a failed dbt artifact, live FX replay,
+Airflow DAG execution, streaming replay with the same checkpoint, and verified bundle
+backup/restore. In the streaming run, two deliveries of 230 messages retain 225 unique
+events and 228 Bronze versions; the additional versions come from source-update tests.
 
-## Security, cloud and operations
+[Validation records](docs/validation/full-platform-2026-11-15.json) ·
+[Test boundaries](docs/testing.md) ·
+[GitHub Actions](https://github.com/longieoo/digital-banking-open-lakehouse/actions)
 
-Gold excludes direct PII and provides masked labels. PostgreSQL masked views/roles and Trino Gold-only analyst rules demonstrate least privilege. Local Trino HTTP usernames are unauthenticated: shared use requires TLS and identity enforcement. Secrets remain in ignored .env or external storage.
+## Operations and project layout
 
-Terraform provisions ADLS Gen2 and Key Vault with RBAC/restricted access; MinIO remains the local alternative. Cloud REST hosting and identity validation remain prerequisites. No paid resources or always-on compute were deployed. [Azure](docs/azure.md) · [Cost and teardown](docs/cloud-cost.md) · [Security](docs/security.md)
+The [operation guide](docs/full-platform.md) includes live FX ingestion, HTTP readiness,
+backup/restore, retention inventory and complete source packaging. Restoring a bundle
+does not publish it automatically. The retention planner never deletes Iceberg history.
 
-CI checks lint, contracts, local Iceberg, SQL, dbt parsing, Compose and Terraform. Manifests, JSON metrics and monitoring SQL expose failures, retries, counts and freshness. [Observability](docs/observability.md)
+- `bank/`, `sources/`, `config/`: source contracts, ingestion, releases and serving.
+- `processing/`, `streaming/`: Spark conformance and the Redpanda consumer/producer.
+- `dbt/`: dimensions, facts, marts and data tests.
+- `orchestration/`, `docker/`, `query/`: Airflow, service images and Trino configuration.
+- `infra/terraform/`: Azure storage, RBAC and Key Vault definitions.
+- `tests/`, `benchmarks/`, `monitoring/`: verification and performance/operations tools.
+- `bi/`, `docs/`: dashboard guidance, Power BI measures and technical documentation.
 
-## Portfolio navigation
+## Scope and next work
 
-- [Architecture and dimensional model](docs/architecture.md)
-- [Implementation and validation ledger](docs/implementation-plan.md)
-- [Streaming guarantees and limits](docs/streaming.md)
-- [Airflow and metadata runner](docs/orchestration.md)
-- [Power BI model, four-page specification and DAX](bi/README.md)
-- [25 interview-defense topics](docs/interview-defense.md)
-- [Coursework reuse](docs/coursework/README.md)
-- [Known limitations and next gates](docs/limitations.md)
+This is a working educational platform, not a production banking deployment.
+Current limits include single-host coordination, full Silver/Gold rebuilds, retained
+stream-history scans and simplified accounting assumptions. General CDC/deletes,
+incremental correction handling and distributed HA need further design and evidence.
 
-Repository modules: bank/ and sources/ for source/ingestion contracts; processing/ for Spark; dbt/ for Gold; streaming/, orchestration/, query/, infra/terraform/, tests/, benchmarks/, monitoring/, bi/ and docs/. No runtime data or Terraform state belongs in Git.
-
-The current release design is documented in [ADR 009](docs/adr/009-certified-data-releases.md).
-Further scale work is incremental processing, bounded streaming and table maintenance;
-an actual Power BI Desktop artifact is still a separate acceptance boundary. Azure/FX
-connections are treated as completed external inputs for the current upgrade scope.
+Azure deployment and ADLS identity checks require configured infrastructure;
+Terraform validation alone does not prove them. A runnable web dashboard is included,
+while native Power BI execution and full infrastructure disaster recovery remain
+separate acceptance gates. See [limitations](docs/limitations.md) and
+[Azure acceptance](docs/azure-acceptance.md) for the exact boundaries.
